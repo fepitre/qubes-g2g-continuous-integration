@@ -47,6 +47,7 @@ def main(args=None):
     # input data
     untrusted_repo_full_name = sys.stdin.readline().strip()
     untrusted_pr_number = sys.stdin.readline().strip()
+    untrusted_target_branch = sys.stdin.readline().strip()
     (untrusted_repo_owner, untrusted_repo_name) = \
         untrusted_repo_full_name.split('/', 1)
 
@@ -69,8 +70,9 @@ def main(args=None):
     # input data sanitized
     repo_name = untrusted_repo_name
     pr_number = int(untrusted_pr_number)
+    target_branch = untrusted_target_branch
 
-    logger.info('Received %s/%s', repo_owner, pr_number)
+    logger.info('Received %s/%s (target branch: %s)', repo_owner, pr_number, target_branch)
 
     create_branch_cmd = [
         '{}/create-gitlab-branch.py'.format(config.get('DEFAULT', 'home')),
@@ -81,11 +83,20 @@ def main(args=None):
         '--debug'
     ]
 
+    if target_branch:
+        pr_branch = 'pr-{}-{}'.format(pr_number, target_branch)
+        create_branch_cmd.extend(
+            ['--target-branch', '{}'.format(target_branch)]
+        )
+    else:
+        pr_branch = 'pr-{}'.format(pr_number)
+
     process_pipeline_cmd = [
         '{}/process-pipeline-status.py'.format(config.get('DEFAULT', 'home')),
         '--component', '{}'.format(repo_name),
         '--owner', '{}'.format(repo_owner),
         '--pull-request', str(pr_number),
+        '--branch', pr_branch,
         '--debug'
     ]
 

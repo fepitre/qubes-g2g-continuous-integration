@@ -39,9 +39,10 @@ def handle(obj):
             return
         repo_name = obj['pull_request']['base']['repo']['full_name']
         pr_id = obj['pull_request']['number']
+        target_branch = obj['pull_request']['base']['ref']
         # set target domain in qrexec policy
         qrexec('dom0', 'qubesinfra.GitlabCI',
-               '{}\n{}\n'.format(repo_name, pr_id))
+               '{}\n{}\n{}\n'.format(repo_name, pr_id, target_branch))
     except KeyError:
         pass
 

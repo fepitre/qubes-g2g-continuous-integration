@@ -36,6 +36,8 @@ parser.add_argument('--owner', action='store', type=str, required=True,
                     help='Owner of the project where the pullrequest is made (e.g. QubesOS)')
 parser.add_argument('--pull-request', action='store', type=int, required=True,
                     help='Pullrequest number into the project')
+parser.add_argument('--branch', action='store', type=str, required=True,
+                    help='Branch to process')
 parser.add_argument('--verbose', action='store_true')
 parser.add_argument('--debug', action='store_true')
 
@@ -124,7 +126,7 @@ def main(args=None):
                                                args.pull_request)
 
     for _ in range(60):
-        pipeline_ref = 'pr-%s' % args.pull_request
+        pipeline_ref = '%s' % args.branch
         pipeline = gitlabcli.get_pipeline(args.component, pipeline_ref)
         if pipeline:
             break

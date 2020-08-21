@@ -24,6 +24,8 @@ parser.add_argument('--repo', action='store', type=str, required=True,
                     help='owner/project in Gitlab instance')
 parser.add_argument('--trigger-build', action='store_true', default=False,
                     help='Trigger build in Gitlab CI/CD')
+parser.add_argument('--target-branch', action='store', type=str,
+                    help='Target branch of the pullrequest.')
 parser.add_argument('--noclean', action='store_true', default=False,
                     help='Do not delete build VM')
 parser.add_argument('--verbose', action='store_true')
@@ -60,15 +62,18 @@ def main(args=None):
         git.clone(args.clone)
         if args.pull_request:
             remote_ref = '+refs/pull/*/head:refs/remotes/origin/pr/*'
-            logger.debug('Fetch %s %s' % ('origin', remote_ref))
+            logger.debug('Fetch {} {}'.format('origin', remote_ref))
             git.fetch('origin', remote_ref)
-            branch = 'pr-%s' % args.pull_request
+            if args.target_branch:
+                branch = 'pr-{}-{}'.format(args.pull_request, args.target_branch)
+            else:
+                branch = 'pr-%s' % args.pull_request
             ref = 'origin/pr/%s' % args.pull_request
             logger.debug('Checkout %s' % ref)
             git.checkout(ref, branch=branch)
 
         else:
-            logger.debug('Fetch %s %s' % ('origin', args.ref))
+            logger.debug('Fetch {} {}'.format('origin', args.ref))
             git.fetch('origin', args.ref)
             branch = args.ref
             if args.ref != 'master':
