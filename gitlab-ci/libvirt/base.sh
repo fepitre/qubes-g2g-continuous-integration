@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# Based on https://docs.gitlab.com/runner/executors/custom_examples/libvirt.html
+
 # /opt/libivrt-driver/base.sh
 
 VM_IMAGES_PATH="/var/lib/libvirt/images"
