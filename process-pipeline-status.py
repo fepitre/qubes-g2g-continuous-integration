@@ -150,33 +150,37 @@ def main(args=None):
                 pipeline_url
             )
 
-        # Timeout of 1d
-        for _ in range(1440):
-            pipeline.refresh()
-            if pipeline.status in ('pending', 'running'):
-                githubappcli.submit_commit_status(
-                    github_project,
-                    github_pr.head.sha,
-                    gitlab_to_github_status(pipeline.status),
-                    pipeline.status,
-                    pipeline_url
-                )
-                time.sleep(60)
-            else:
-                final_status = pipeline.status
-                break
+        # In case of retry and pipeline is already done and succeeded
+        if pipeline.status != "success":
+            # Timeout of 1d
+            for _ in range(1440):
+                pipeline.refresh()
+                if pipeline.status in ('pending', 'running'):
+                    githubappcli.submit_commit_status(
+                        github_project,
+                        github_pr.head.sha,
+                        gitlab_to_github_status(pipeline.status),
+                        pipeline.status,
+                        pipeline_url
+                    )
+                    time.sleep(60)
+                else:
+                    final_status = pipeline.status
+                    break
 
-        if not final_status:
-            logger.error("Pipeline {}: Timeout reached!".format(pipeline.id))
-            final_status = 'failure'
+            if not final_status:
+                logger.error("Pipeline {}: Timeout reached!".format(pipeline.id))
+                final_status = 'failure'
 
-        githubappcli.submit_commit_status(
-            github_project,
-            github_pr.head.sha,
-            gitlab_to_github_status(pipeline.status),
-            pipeline.status,
-            pipeline_url
-        )
+            githubappcli.submit_commit_status(
+                github_project,
+                github_pr.head.sha,
+                gitlab_to_github_status(pipeline.status),
+                pipeline.status,
+                pipeline_url
+            )
+        else:
+            final_status = pipeline.status
         logger.error("Pipeline {}: {}.".format(pipeline.id, final_status))
     except Exception as e:
         logger.error(
