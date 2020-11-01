@@ -125,8 +125,10 @@ def main(args=None):
         github_pr = githubcli.get_pull_request(args.owner, args.component,
                                                args.pull_request)
 
+    pipeline_ref = '%s' % args.branch
+    logger.debug("Waiting pipeline {} for {} to be created...".format(
+        pipeline_ref, args.component))
     for _ in range(60):
-        pipeline_ref = '%s' % args.branch
         pipeline = gitlabcli.get_pipeline(args.component, pipeline_ref)
         if pipeline:
             break
@@ -142,6 +144,7 @@ def main(args=None):
 
     try:
         if args.pull_request:
+            logger.debug("Submitting initial pipeline status to Github...")
             githubappcli.submit_commit_status(
                 github_project,
                 github_pr.head.sha,
@@ -172,6 +175,7 @@ def main(args=None):
                 logger.error("Pipeline {}: Timeout reached!".format(pipeline.id))
                 final_status = 'failure'
 
+            logger.debug("Submitting final pipeline status to Github...")
             githubappcli.submit_commit_status(
                 github_project,
                 github_pr.head.sha,
