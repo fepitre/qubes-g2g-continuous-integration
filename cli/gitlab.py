@@ -13,7 +13,9 @@ class GitlabCli:
                 return runner
 
     def get_project(self, name):
-        projects = self.gl.projects.list()
+        projects = self.gl.projects.list(search=name)
+        # in case of common name acting as suffix like 'qubes-builder'
+        # it will return 'qubes-builder*' matching repository names
         for project in projects:
             if project.name == name:
                 return project
