@@ -4,7 +4,7 @@ set -x
 
 virt-builder debian-10 \
     --size 30G \
-    --output /var/lib/libvirt/images/gitlab-runner-base.qcow2 \
+    --output /var/lib/libvirt/images/gitlab-runner-debian.qcow2 \
     --format qcow2 \
     --hostname gitlab-runner-buster \
     --network \
