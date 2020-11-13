@@ -9,8 +9,23 @@ class GitlabCli:
     def get_runner(self, name):
         runners = self.gl.runners.list()
         for runner in runners:
-            if runner.name == name:
+            # desc is referring the hostname
+            if runner.description == name:
                 return runner
+
+    def add_runner(self, project_name, runner_name):
+        project = self.get_project(project_name)
+        runner = self.get_runner(runner_name)
+        if project and runner:
+            if runner not in project.runners.list():
+                project.runners.create({'runner_id': runner.id})
+
+    def remove_runner(self, project_name, runner_name):
+        project = self.get_project(project_name)
+        runner = self.get_runner(runner_name)
+        if project and runner:
+            if runner in project.runners.list():
+                project.runners.delete(runner.id)
 
     def get_project(self, name):
         projects = self.gl.projects.list(search=name)
