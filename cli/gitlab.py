@@ -56,9 +56,11 @@ class GitlabCli:
             pipeline.update(options)
         return self.get_project(project_name).pipelines.create(pipeline)
 
-    def get_pipeline(self, project_name, ref):
+    def get_pipeline(self, project_name, ref, only_finished=False):
         project = self.get_project(project_name)
         if project:
             for pipeline in project.pipelines.list():
                 if pipeline.ref == ref:
+                    if only_finished and pipeline.status not in ('failed', 'success'):
+                        continue
                     return pipeline
