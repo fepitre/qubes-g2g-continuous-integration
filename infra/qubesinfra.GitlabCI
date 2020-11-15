@@ -78,7 +78,7 @@ def main(args=None):
         '{}/create-gitlab-branch.py'.format(config.get('DEFAULT', 'home')),
         '--clone', 'https://github.com/{}/{}'.format(repo_owner, repo_name),
         '--pull-request', str(pr_number),
-        '--push', '{}'.format('https://gitlab.notset.fr'),
+        '--push', '{}'.format('https://gitlab.com'),
         '--repo', '{}/{}'.format('QubesOS', repo_name),
         '--debug'
     ]

@@ -75,7 +75,7 @@ def main(args=None):
     else:
         logger.setLevel(logging.ERROR)
 
-    gitlab_url = 'https://gitlab.notset.fr'
+    gitlab_url = 'https://gitlab.com'
 
     github_app_id = os.getenv("GITHUB_APP_ID")
     pem_file_path = os.getenv("PEM_FILE_PATH")
