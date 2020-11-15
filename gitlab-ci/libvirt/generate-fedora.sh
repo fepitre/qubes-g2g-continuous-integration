@@ -29,4 +29,5 @@ virt-builder -v fedora-30 \
     --run-command "sed -i 's/^SELINUX=.*/SELINUX=disabled/g' /etc/selinux/config" \
     --root-password password:root \
     --install devscripts,debootstrap,pbuilder,git,python3-sh,wget,createrepo,rpm,yum,yum-utils,mock,rsync,rpmdevtools,rpm-build,perl-Digest-MD5,perl-Digest-SHA,python3-pyyaml \
+    --install hunspell,pandoc,jq,rubygems,ruby-devel,gcc-c++,pkg-config,libxml2,libxslt,libxml2-devel,libxslt-devel,rubygem-bundler \
     --update
