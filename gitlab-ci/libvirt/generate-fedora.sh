@@ -2,7 +2,7 @@
 
 set -x
 
-virt-builder -v fedora-30 \
+virt-builder fedora-30 \
     --smp 4 \
     --memsize 4096 \
     --size 30G \
