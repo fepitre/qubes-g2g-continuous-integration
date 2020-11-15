@@ -79,7 +79,7 @@ def main(args=None):
         '--clone', 'https://github.com/{}/{}'.format(repo_owner, repo_name),
         '--pull-request', str(pr_number),
         '--push', '{}'.format('https://gitlab.notset.fr'),
-        '--repo', '{}/{}'.format('fepitre-bot', repo_name),
+        '--repo', '{}/{}'.format('QubesOS', repo_name),
         '--debug'
     ]
 

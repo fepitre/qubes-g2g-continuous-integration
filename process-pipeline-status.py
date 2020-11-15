@@ -139,7 +139,7 @@ def main(args=None):
             "Cannot find pipeline for {} with reference 'pr-{}'".format(
                 args.component, args.pull_request))
         return 1
-    gitlab_component_url = gitlab_url + '/fepitre-bot/%s' % args.component
+    gitlab_component_url = gitlab_url + '/QubesOS/%s' % args.component
     pipeline_url = "{}".format(get_url(gitlab_component_url, pipeline.id))
 
     try:
