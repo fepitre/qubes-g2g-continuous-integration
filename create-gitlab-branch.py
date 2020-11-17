@@ -22,7 +22,6 @@ parser.add_argument('--pull-request', action='store', type=int,
                     help='Git pullrequest reference to use')
 parser.add_argument('--repo', action='store', type=str, required=True,
                     help='owner/project in Gitlab instance')
-parser.add_argument('--pull-request-use-head-ref', action='store_true')
 # parser.add_argument('--trigger-build', action='store_true', default=False,
 #                     help='Trigger build in Gitlab CI/CD')
 # parser.add_argument('--noclean', action='store_true', default=False,
@@ -60,15 +59,16 @@ def main(args=None):
         logger.debug('Clone %s' % args.clone)
         git.clone(args.clone)
         if args.pull_request:
-            remote_ref = '+refs/pull/*/merge:refs/remotes/origin/pr/*'
-            if args.pull_request_use_head_ref:
-                remote_ref = '+refs/pull/*/head:refs/remotes/origin/pr/*'
+            branch = 'pr-%s' % args.pull_request
+            remote_ref = '+refs/pull/%d/merge' % args.pull_request
+            ref = 'FETCH_HEAD'
+
             logger.debug('Fetch {} {}'.format('origin', remote_ref))
             git.fetch('origin', remote_ref)
-            branch = 'pr-%s' % args.pull_request
-            ref = 'origin/pr/%s' % args.pull_request
+
             logger.debug('Checkout %s' % ref)
             git.checkout(ref, branch=branch)
+            git.reset(ref, hard=True)
         else:
             logger.debug('Fetch {} {}'.format('origin', args.ref))
             git.fetch('origin', args.ref)

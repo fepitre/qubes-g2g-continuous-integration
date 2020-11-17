@@ -16,6 +16,16 @@ class GitCli:
 
         return result.returncode, result.stdout, result.stderr
 
+    def reset(self, ref, hard=False):
+        if hard:
+            cmd = 'git reset -q --hard {ref}'
+        else:
+            cmd = 'git reset -q {ref}'
+        result = subprocess.run(cmd.format(
+            ref=ref), shell=True, cwd=self.repo)
+
+        return result.returncode, result.stdout, result.stderr
+
     def fetch(self, source, branch='master'):
         result = subprocess.run('git fetch -q {source} --tags {branch}'.format(
             source=source, branch=branch), shell=True, cwd=self.repo)
