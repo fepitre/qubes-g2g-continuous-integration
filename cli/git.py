@@ -8,16 +8,16 @@ class GitCli:
 
     def clone(self, source, branch=None):
         if branch:
-            repo = 'git clone -q -b {branch} {src} {dst}'
+            repo = 'git clone -b {branch} {src} {dst}'
         else:
-            repo = 'git clone -q {src} {dst}'
+            repo = 'git clone {src} {dst}'
         result = subprocess.run(repo.format(
             src=source, dst=self.repo, branch=branch), shell=True)
 
         return result.returncode, result.stdout, result.stderr
 
     def delete_remote_branch(self, source, branch):
-        cmd = 'git push -q {source} --delete {branch}'
+        cmd = 'git push {source} --delete {branch}'
         result = subprocess.run(cmd.format(
             source=source, branch=branch), shell=True, cwd=self.repo)
 
@@ -25,9 +25,9 @@ class GitCli:
 
     def reset(self, ref, hard=False):
         if hard:
-            cmd = 'git reset -q --hard {ref}'
+            cmd = 'git reset --hard {ref}'
         else:
-            cmd = 'git reset -q {ref}'
+            cmd = 'git reset {ref}'
         result = subprocess.run(cmd.format(
             ref=ref), shell=True, cwd=self.repo)
 
@@ -41,10 +41,10 @@ class GitCli:
 
     def push(self, remote, branch='master', force=False):
         if force:
-            cmd = 'git push -f -q -u {remote} {branch}'.format(
+            cmd = 'git push -f -u {remote} {branch}'.format(
                 remote=remote, branch=branch)
         else:
-            cmd = 'git push -q -u {remote} {branch}'.format(
+            cmd = 'git push -u {remote} {branch}'.format(
                 remote=remote, branch=branch)
         result = subprocess.run(cmd, shell=True, cwd=self.repo)
 
@@ -52,10 +52,10 @@ class GitCli:
 
     def checkout(self, ref, branch=None):
         if branch:
-            cmd = 'git checkout -b {branch} -q {ref}'.format(
+            cmd = 'git checkout -b {branch} {ref}'.format(
                 branch=branch, ref=ref)
         else:
-            cmd = 'git checkout -q {ref}'.format(
+            cmd = 'git checkout {ref}'.format(
                 ref=ref)
         result = subprocess.run(cmd, shell=True, cwd=self.repo)
 
