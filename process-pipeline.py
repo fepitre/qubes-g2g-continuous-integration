@@ -33,15 +33,16 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--component', action='store', type=str, required=True,
                     help='Project name (e.g. qubes-linux-kernel)')
 parser.add_argument('--owner', action='store', type=str, required=True,
-                    help='Owner of the project where the pullrequest is made (e.g. QubesOS)')
+                    help='Owner of the project where the pullrequest is made '
+                         '(e.g. QubesOS)')
 parser.add_argument('--pull-request', action='store', type=int, required=True,
                     help='Pullrequest number into the project')
-parser.add_argument('--branch', action='store', type=str, required=True,
-                    help='Branch to process')
+# parser.add_argument('--action', action='store', type=str, required=True,
+#                     help='Action to perform: new, refresh', default='new')
 parser.add_argument('--verbose', action='store_true')
 parser.add_argument('--debug', action='store_true')
 
-logger = logging.getLogger('process-pipeline-status')
+logger = logging.getLogger('process-pipeline')
 console_handler = logging.StreamHandler(sys.stderr)
 logger.addHandler(console_handler)
 
@@ -125,11 +126,21 @@ def main(args=None):
         github_pr = githubcli.get_pull_request(args.owner, args.component,
                                                args.pull_request)
 
-    pipeline_ref = '%s' % args.branch
-    logger.debug("Waiting pipeline {} for {} to be created...".format(
-        pipeline_ref, args.component))
+    if not github_pr:
+        logger.error(
+            "Cannot find Github PR for {} with reference 'pr-{}'".format(
+                args.component, args.pull_request))
+        return 1
+
+    pipeline_ref = 'pr-%s' % args.pull_request
+
     for _ in range(60):
-        pipeline = gitlabcli.get_pipeline(args.component, pipeline_ref)
+        # disgusting hack to handle legacy adding suffix for orig branch filter
+        for ref in [pipeline_ref, pipeline_ref + '-master',
+                    pipeline_ref + '-release4.0']:
+            pipeline = gitlabcli.get_pipeline(args.component, ref)
+            if pipeline:
+                break
         if pipeline:
             break
         time.sleep(10)
@@ -172,7 +183,8 @@ def main(args=None):
                     break
 
             if not final_status:
-                logger.error("Pipeline {}: Timeout reached!".format(pipeline.id))
+                logger.error(
+                    "Pipeline {}: Timeout reached!".format(pipeline.id))
                 final_status = 'failure'
 
             logger.debug("Submitting final pipeline status to Github...")

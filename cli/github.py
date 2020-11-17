@@ -36,7 +36,7 @@ class GithubAppCli:
             'Accept': 'application/vnd.github.machine-man-preview+json',
         })
         if r.status_code != 201:
-            raise Exception("Failed to generate token")
+            raise Exception("GithubApp: Failed to generate token")
         resp = r.json()
         self.token = resp['token']
         self.expires_at = dateutil.parser.parse(resp['expires_at'])

@@ -33,16 +33,27 @@ def qrexec(vm, service, input_data=None):
 
 def handle(obj):
     try:
-        if 'pull_request' not in obj:
-            return
-        if obj['action'] not in ['opened', 'synchronize']:
-            return
-        repo_name = obj['pull_request']['base']['repo']['full_name']
-        pr_id = obj['pull_request']['number']
-        target_branch = obj['pull_request']['base']['ref']
-        # set target domain in qrexec policy
-        qrexec('dom0', 'qubesinfra.GitlabCI',
-               '{}\n{}\n{}\n'.format(repo_name, pr_id, target_branch))
+        if 'pull_request' in obj:
+            if obj['action'] not in ['opened', 'synchronize']:
+                return
+            repo_name = obj['pull_request']['base']['repo']['full_name']
+            pr_id = obj['pull_request']['number']
+            base_ref = obj['pull_request']['base']['ref']
+            # set target domain in qrexec policy
+            qrexec('dom0', 'gitlabci.PullRequest',
+                   '{}\n{}\n{}\n'.format(repo_name, pr_id, base_ref))
+        elif 'issue' in obj:
+            if obj['action'] != 'created':
+                return
+            if not obj['issue'].get('pull_request', None):
+                return
+            repo_url = obj['issue']['pull_request']['url']
+            user = obj['comment']['user']['login']
+            comment_body = obj['comment']['body']
+            # set target domain in qrexec policy
+            qrexec('dom0', 'gitlabci.ProcessGithubCommand',
+                   '{}\n{}\n{}\n'.format(repo_url, user, comment_body))
+
     except KeyError:
         pass
 

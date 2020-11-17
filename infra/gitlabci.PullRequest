@@ -25,7 +25,7 @@ import subprocess
 import sys
 import logging
 
-logger = logging.getLogger('qubesinfra.GitlabCI')
+logger = logging.getLogger('gitlabci.PullRequest')
 console_handler = logging.StreamHandler(sys.stderr)
 logger.addHandler(console_handler)
 
@@ -47,7 +47,9 @@ def main(args=None):
     # input data
     untrusted_repo_full_name = sys.stdin.readline().strip()
     untrusted_pr_number = sys.stdin.readline().strip()
-    untrusted_target_branch = sys.stdin.readline().strip()
+    # This is for information only as we don't need to use is as suffix for
+    # managing the CI. We have .gitlab-ci.yml file now.
+    untrusted_base_ref = sys.stdin.readline().strip()
     (untrusted_repo_owner, untrusted_repo_name) = \
         untrusted_repo_full_name.split('/', 1)
 
@@ -70,35 +72,7 @@ def main(args=None):
     # input data sanitized
     repo_name = untrusted_repo_name
     pr_number = int(untrusted_pr_number)
-    target_branch = untrusted_target_branch
-
-    logger.info('Received %s/%s (target branch: %s)', repo_owner, pr_number, target_branch)
-
-    create_branch_cmd = [
-        '{}/create-gitlab-branch.py'.format(config.get('DEFAULT', 'home')),
-        '--clone', 'https://github.com/{}/{}'.format(repo_owner, repo_name),
-        '--pull-request', str(pr_number),
-        '--push', '{}'.format('https://gitlab.com'),
-        '--repo', '{}/{}'.format('QubesOS', repo_name),
-        '--debug'
-    ]
-
-    if target_branch:
-        pr_branch = 'pr-{}-{}'.format(pr_number, target_branch)
-        create_branch_cmd.extend(
-            ['--target-branch', '{}'.format(target_branch)]
-        )
-    else:
-        pr_branch = 'pr-{}'.format(pr_number)
-
-    process_pipeline_cmd = [
-        '{}/process-pipeline-status.py'.format(config.get('DEFAULT', 'home')),
-        '--component', '{}'.format(repo_name),
-        '--owner', '{}'.format(repo_owner),
-        '--pull-request', str(pr_number),
-        '--branch', pr_branch,
-        '--debug'
-    ]
+    base_ref = untrusted_base_ref
 
     command_env = os.environ.copy()
     if config.get('DEFAULT', 'github_app_id', fallback=None):
@@ -116,6 +90,26 @@ def main(args=None):
     if config.get('DEFAULT', 'gitlab_api_token', fallback=None):
         command_env['GITLAB_API_TOKEN'] = config.get(
             'DEFAULT', 'gitlab_api_token')
+
+    logger.info('Received %s/%s (base ref: %s)', repo_owner, pr_number,
+                base_ref)
+
+    create_branch_cmd = [
+        '{}/create-gitlab-branch.py'.format(config.get('DEFAULT', 'home')),
+        '--clone', 'https://github.com/{}/{}'.format(repo_owner, repo_name),
+        '--push', '{}'.format('https://gitlab.com'),
+        '--repo', '{}/{}'.format('QubesOS', repo_name),
+        '--pull-request', str(pr_number),
+        '--debug'
+    ]
+
+    process_pipeline_cmd = [
+        '{}/process-pipeline.py'.format(config.get('DEFAULT', 'home')),
+        '--component', '{}'.format(repo_name),
+        '--owner', '{}'.format(repo_owner),
+        '--pull-request', str(pr_number),
+        '--debug'
+    ]
 
     subprocess.check_call(create_branch_cmd, stdin=open(os.devnull, 'r'),
                           env=command_env)
