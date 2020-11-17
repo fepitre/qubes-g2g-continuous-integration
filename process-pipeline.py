@@ -135,7 +135,9 @@ def main(args=None):
     pipeline_ref = 'pr-%s' % args.pull_request
 
     # If something was wrong at create-gitlab-branch stage, report fail status
-    if not gitlabcli.get_branch(args.owner, args.component, pipeline_ref):
+    if not gitlabcli.get_branch(args.owner, args.component, pipeline_ref) and \
+            not gitlabcli.get_branch(
+                args.owner, args.component, pipeline_ref + '-master'):
         logger.debug(
             "Submitting fail status to Github due to missing Gitlab branch...")
         githubappcli.submit_commit_status(
