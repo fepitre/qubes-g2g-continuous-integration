@@ -151,7 +151,7 @@ def main(args=None):
         # disgusting hack to handle legacy adding suffix for orig branch filter
         for ref in [pipeline_ref, pipeline_ref + '-master',
                     pipeline_ref + '-release4.0']:
-            pipeline = gitlabcli.get_pipeline('QubesOS', args.component, ref)
+            pipeline = gitlabcli.get_pipeline(args.owner, args.component, ref)
             if pipeline:
                 break
         if pipeline:
@@ -163,7 +163,7 @@ def main(args=None):
             "Cannot find pipeline for {} with reference 'pr-{}'".format(
                 args.component, args.pull_request))
         return 1
-    gitlab_component_url = gitlab_url + '/QubesOS/%s' % args.component
+    gitlab_component_url = gitlab_url + '/%s/%s' % (args.owner, args.component)
     pipeline_url = "{}".format(get_url(gitlab_component_url, pipeline.id))
 
     try:

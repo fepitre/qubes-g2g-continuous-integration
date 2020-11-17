@@ -66,7 +66,7 @@ class GithubAppCli:
             'Authorization': 'token ' + self.get_token(),
             'Accept': 'application/vnd.github.machine-man-preview+json'
         })
-        print(r.status_code)
+        return r.status_code
 
 
 class GithubCli:
