@@ -6,8 +6,12 @@ class GitCli:
     def __init__(self, repo):
         self.repo = repo
 
-    def clone(self, source, branch='master'):
-        result = subprocess.run('git clone -q -b {branch} {src} {dst}'.format(
+    def clone(self, source, branch=None):
+        if branch:
+            repo = 'git clone -q -b {branch} {src} {dst}'
+        else:
+            repo = 'git clone -q {src} {dst}'
+        result = subprocess.run(repo.format(
             src=source, dst=self.repo, branch=branch), shell=True)
 
         return result.returncode, result.stdout, result.stderr

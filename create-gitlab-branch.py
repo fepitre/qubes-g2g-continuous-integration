@@ -58,7 +58,7 @@ def main(args=None):
     try:
         git = GitCli(tmpdir)
         logger.debug('Clone %s' % args.clone)
-        git.clone(args.clone, args.target_branch)
+        git.clone(args.clone)
         if args.pull_request:
             remote_ref = '+refs/pull/*/merge:refs/remotes/origin/pr/*'
             if args.pull_request_use_head_ref:
