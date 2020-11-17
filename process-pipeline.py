@@ -134,11 +134,24 @@ def main(args=None):
 
     pipeline_ref = 'pr-%s' % args.pull_request
 
+    # If something was wrong at create-gitlab-branch stage, report fail status
+    if not gitlabcli.get_branch(args.owner, args.component, pipeline_ref):
+        logger.debug(
+            "Submitting fail status to Github due to missing Gitlab branch...")
+        githubappcli.submit_commit_status(
+            github_project,
+            github_pr.head.sha,
+            'failure',
+            'failed',
+            ''
+        )
+        return 1
+
     for _ in range(60):
         # disgusting hack to handle legacy adding suffix for orig branch filter
         for ref in [pipeline_ref, pipeline_ref + '-master',
                     pipeline_ref + '-release4.0']:
-            pipeline = gitlabcli.get_pipeline(args.component, ref)
+            pipeline = gitlabcli.get_pipeline('QubesOS', args.component, ref)
             if pipeline:
                 break
         if pipeline:

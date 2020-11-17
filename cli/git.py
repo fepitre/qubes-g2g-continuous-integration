@@ -16,6 +16,13 @@ class GitCli:
 
         return result.returncode, result.stdout, result.stderr
 
+    def delete_remote_branch(self, source, branch):
+        cmd = 'git push -q {source} --delete {branch}'
+        result = subprocess.run(cmd.format(
+            source=source, branch=branch), shell=True, cwd=self.repo)
+
+        return result.returncode, result.stdout, result.stderr
+
     def reset(self, ref, hard=False):
         if hard:
             cmd = 'git reset -q --hard {ref}'

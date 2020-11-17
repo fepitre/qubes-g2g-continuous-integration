@@ -58,24 +58,26 @@ def main(args=None):
         git = GitCli(tmpdir)
         logger.debug('Clone %s' % args.clone)
         git.clone(args.clone)
+        fetchref_found = False
         if args.pull_request:
             branch = 'pr-%s' % args.pull_request
             remote_ref = '+refs/pull/%d/merge' % args.pull_request
             ref = 'FETCH_HEAD'
 
             logger.debug('Fetch {} {}'.format('origin', remote_ref))
-            git.fetch('origin', remote_ref)
-
-            logger.debug('Checkout %s' % ref)
-            git.checkout(ref, branch=branch)
-            git.reset(ref, hard=True)
+            if git.fetch('origin', remote_ref) == 0:
+                fetchref_found = True
+                logger.debug('Checkout %s' % ref)
+                git.checkout(ref, branch=branch)
+                git.reset(ref, hard=True)
         else:
             logger.debug('Fetch {} {}'.format('origin', args.ref))
-            git.fetch('origin', args.ref)
             branch = args.ref
-            if args.ref != 'master':
-                logger.debug('Checkout %s' % args.ref)
-                git.checkout(args.ref, branch=branch)
+            if git.fetch('origin', args.ref) == 0:
+                fetchref_found = True
+                if args.ref != 'master':
+                    logger.debug('Checkout %s' % args.ref)
+                    git.checkout(args.ref, branch=branch)
 
         parsed_repo = args.repo.rstrip('/').split('/')
         repo_owner = parsed_repo[0]
@@ -85,24 +87,16 @@ def main(args=None):
             token=os.environ['GITLAB_API_TOKEN'],
             gitlab_url=args.push.replace('https://', ''), repo=args.repo,
             repo_owner=repo_owner)
+
         logger.debug('Add remote %s' % repo_owner)
         git.remote_add(repo_owner, url)
-        logger.debug('Push to %s', repo_owner)
-        git.push(repo_owner, branch, force=True)
 
-        # if args.trigger_build:
-        #     cli = GitlabCli(url=args.push, token=os.environ['GITLAB_API_TOKEN'])
-        #     pipeline_options = {
-        #         'ref': branch,
-        #         'variables': [
-        #             {
-        #                 'key': 'NO_CLEANUP',
-        #                 'value': str(int(args.noclean))
-        #             }
-        #         ]
-        #     }
-        #     logger.debug('Trigger build for %s' % repo_name)
-        #     cli.create_pipeline(repo_name, pipeline_options)
+        logger.debug('Delete remote branch %s' % branch)
+        git.delete_remote_branch(repo_owner, branch)
+
+        if fetchref_found:
+            logger.debug('Push to %s', repo_owner)
+            git.push(repo_owner, branch, force=True)
     finally:
         shutil.rmtree(tmpdir)
 
