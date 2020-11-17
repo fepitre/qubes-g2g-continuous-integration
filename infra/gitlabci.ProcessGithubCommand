@@ -147,10 +147,13 @@ def main(args=None):
             ]
             commands = [create_branch_cmd, process_pipeline_cmd]
 
-        for cmd in commands:
-            logger.debug('Running %s' % ' '.join(cmd))
-            subprocess.check_call(cmd, stdin=open(os.devnull, 'r'),
-                                  env=command_env)
+        try:
+            for cmd in commands:
+                logger.debug('Running %s' % ' '.join(cmd))
+                subprocess.check_call(cmd, stdin=open(os.devnull, 'r'),
+                                      env=command_env)
+        except subprocess.CalledProcessError:
+            logger.info("An error occured while processing: %s" % github_cmd)
 
 
 if __name__ == '__main__':

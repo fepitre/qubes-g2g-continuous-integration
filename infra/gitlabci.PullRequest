@@ -57,8 +57,8 @@ def main(args=None):
     if untrusted_repo_owner not in owner_whitelist:
         logger.error('Repository owner not whitelisted')
         return 1
-
     repo_owner = untrusted_repo_owner
+
     if '/' in untrusted_repo_name:
         logger.info('Invalid character in repository name')
         return 1
@@ -91,7 +91,7 @@ def main(args=None):
         command_env['GITLAB_API_TOKEN'] = config.get(
             'DEFAULT', 'gitlab_api_token')
 
-    logger.info('Received %s/%s (base ref: %s)', repo_owner, pr_number,
+    logger.info('Received %s/%s (base ref: %s)', repo_name, pr_number,
                 base_ref)
 
     create_branch_cmd = [
@@ -111,10 +111,23 @@ def main(args=None):
         '--debug'
     ]
 
-    subprocess.check_call(create_branch_cmd, stdin=open(os.devnull, 'r'),
-                          env=command_env)
-    subprocess.check_call(process_pipeline_cmd, stdin=open(os.devnull, 'r'),
-                          env=command_env)
+    try:
+        subprocess.check_call(create_branch_cmd, stdin=open(os.devnull, 'r'),
+                              env=command_env)
+    except subprocess.CalledProcessError:
+        logger.info(
+            "An error occured while creating Gitlab branch for {}/{}".format(
+                repo_name, str(pr_number)))
+        return 1
+
+    try:
+        subprocess.check_call(process_pipeline_cmd, stdin=open(os.devnull, 'r'),
+                              env=command_env)
+    except subprocess.CalledProcessError:
+        logger.info(
+            "An error occured while processing status for {}/{}".format(
+                repo_name, str(pr_number)))
+        return 1
 
 
 if __name__ == '__main__':
