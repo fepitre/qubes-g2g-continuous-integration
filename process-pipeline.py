@@ -143,7 +143,8 @@ def main(args=None):
             github_pr.head.sha,
             'failure',
             'failed',
-            ''
+            '',
+            "An error occurred while creating pull request branch."
         )
         return 1
 

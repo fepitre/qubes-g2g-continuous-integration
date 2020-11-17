@@ -52,14 +52,16 @@ class GithubAppCli:
         return self.token
 
     def submit_commit_status(self, repo_name, commit_sha, status,
-                             pipeline_status, url):
+                             pipeline_status, url, description=None):
         api_url = 'https://api.github.com/repos/{}/statuses/{}'.format(
             repo_name,
             commit_sha
         )
+        if not description:
+            description = "Pipeline: %s" % pipeline_status
         r = requests.post(api_url, json={
             'state': status,
-            'description': "Pipeline: %s" % pipeline_status,
+            'description': description,
             'target_url': url,
             'context': "continuous-integration/pullrequest",
         }, headers={
