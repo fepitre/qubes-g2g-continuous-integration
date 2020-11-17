@@ -58,30 +58,14 @@ def main(args=None):
         git = GitCli(tmpdir)
         logger.debug('Clone %s' % args.clone)
         git.clone(args.clone)
-        fetchref_found = False
-        if args.pull_request:
-            branch = 'pr-%s' % args.pull_request
-            remote_ref = '+refs/pull/%d/merge' % args.pull_request
-            ref = 'FETCH_HEAD'
-
-            logger.debug('Fetch {} {}'.format('origin', remote_ref))
-            if git.fetch('origin', remote_ref) == 0:
-                fetchref_found = True
-                logger.debug('Checkout %s' % ref)
-                git.checkout(ref, branch=branch)
-                git.reset(ref, hard=True)
-        else:
-            logger.debug('Fetch {} {}'.format('origin', args.ref))
-            branch = args.ref
-            if git.fetch('origin', args.ref) == 0:
-                fetchref_found = True
-                if args.ref != 'master':
-                    logger.debug('Checkout %s' % args.ref)
-                    git.checkout(args.ref, branch=branch)
 
         parsed_repo = args.repo.rstrip('/').split('/')
         repo_owner = parsed_repo[0]
         repo_name = parsed_repo[1]
+
+        branch = args.ref
+        if args.pull_request:
+            branch = 'pr-%s' % args.pull_request
 
         url = 'https://{repo_owner}:{token}@{gitlab_url}/{repo}'.format(
             token=os.environ['GITLAB_API_TOKEN'],
@@ -93,6 +77,27 @@ def main(args=None):
 
         logger.debug('Delete remote branch %s' % branch)
         git.delete_remote_branch(repo_owner, branch)
+
+        fetchref_found = False
+        if args.pull_request:
+            remote_ref = '+refs/pull/%d/merge' % args.pull_request
+            ref = 'FETCH_HEAD'
+
+            logger.debug('Fetch {} {}'.format('origin', remote_ref))
+            exit_code_fetch, stdout, stderr = git.fetch('origin', remote_ref)
+            if exit_code_fetch == 0:
+                fetchref_found = True
+                logger.debug('Checkout %s' % ref)
+                git.checkout(ref, branch=branch)
+                git.reset(ref, hard=True)
+        else:
+            logger.debug('Fetch {} {}'.format('origin', args.ref))
+            exit_code_fetch, stdout, stderr = git.fetch('origin', args.ref)
+            if exit_code_fetch == 0:
+                fetchref_found = True
+                if args.ref != 'master':
+                    logger.debug('Checkout %s' % args.ref)
+                    git.checkout(args.ref, branch=branch)
 
         if fetchref_found:
             logger.debug('Push to %s', repo_owner)

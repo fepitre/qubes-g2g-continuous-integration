@@ -34,7 +34,7 @@ class GitCli:
         return result.returncode, result.stdout, result.stderr
 
     def fetch(self, source, branch='master'):
-        result = subprocess.run('git fetch -q {source} --tags {branch}'.format(
+        result = subprocess.run('git fetch {source} --tags {branch}'.format(
             source=source, branch=branch), shell=True, cwd=self.repo)
 
         return result.returncode, result.stdout, result.stderr
