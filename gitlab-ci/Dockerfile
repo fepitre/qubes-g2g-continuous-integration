@@ -15,6 +15,6 @@ RUN echo 'gitlab-runner ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 
 # debootstrap: workaround until upstream merge it
 # https://salsa.debian.org/installer-team/debootstrap/-/merge_requests/26/
-RUN sed -i 's@if \! doing_variant fakechroot\; then@if \! doing_variant fakechroot \&\& [ \"$CONTAINER\" \!= docker ]\; then@g' /usr/share/debootstrap/scripts/debian-common
+RUN sed -i 's@if \! doing_variant fakechroot\; then@if \! doing_variant fakechroot \&\& [ \"$CONTAINER\" \!= docker ]\; then@g' /usr/share/debootstrap/scripts/debian-common /usr/share/debootstrap/scripts/gutsy
 
 USER gitlab-runner
