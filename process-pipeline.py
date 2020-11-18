@@ -37,8 +37,6 @@ parser.add_argument('--owner', action='store', type=str, required=True,
                          '(e.g. QubesOS)')
 parser.add_argument('--pull-request', action='store', type=int, required=True,
                     help='Pullrequest number into the project')
-# parser.add_argument('--action', action='store', type=str, required=True,
-#                     help='Action to perform: new, refresh', default='new')
 parser.add_argument('--verbose', action='store_true')
 parser.add_argument('--debug', action='store_true')
 
@@ -135,9 +133,7 @@ def main(args=None):
     pipeline_ref = 'pr-%s' % args.pull_request
 
     # If something was wrong at create-gitlab-branch stage, report fail status
-    if not gitlabcli.get_branch(args.owner, args.component, pipeline_ref) and \
-            not gitlabcli.get_branch(
-                args.owner, args.component, pipeline_ref + '-master'):
+    if not gitlabcli.get_branch(args.owner, args.component, pipeline_ref):
         logger.debug(
             "Submitting fail status to Github due to missing Gitlab branch...")
         githubappcli.submit_commit_status(
@@ -217,6 +213,8 @@ def main(args=None):
     except Exception as e:
         logger.error(
             "Pipeline {}: An error occurred: {}".format(pipeline.id, str(e)))
+    finally:
+        gitlabcli.delete_branch(args.owner, args.component, pipeline_ref)
 
 
 if __name__ == '__main__':

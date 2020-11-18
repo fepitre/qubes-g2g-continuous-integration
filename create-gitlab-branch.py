@@ -22,10 +22,6 @@ parser.add_argument('--pull-request', action='store', type=int,
                     help='Git pullrequest reference to use')
 parser.add_argument('--repo', action='store', type=str, required=True,
                     help='owner/project in Gitlab instance')
-# parser.add_argument('--trigger-build', action='store_true', default=False,
-#                     help='Trigger build in Gitlab CI/CD')
-# parser.add_argument('--noclean', action='store_true', default=False,
-#                     help='Do not delete build VM')
 parser.add_argument('--verbose', action='store_true')
 parser.add_argument('--debug', action='store_true')
 

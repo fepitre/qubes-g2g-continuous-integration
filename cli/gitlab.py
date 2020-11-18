@@ -6,6 +6,12 @@ class GitlabCli:
         self.token = token
         self.gl = gitlab.Gitlab(url=url, private_token=token)
 
+    def delete_branch(self, owner, name, branch_name):
+        project = self.get_project(owner, name)
+        for branch in project.branches.list():
+            if branch.name == branch_name:
+                branch.delete()
+
     def get_branch(self, owner, name, branch_name):
         project = self.get_project(owner, name)
         for branch in project.branches.list():
