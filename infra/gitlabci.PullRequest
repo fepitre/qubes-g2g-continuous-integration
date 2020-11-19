@@ -63,11 +63,11 @@ def main(args=None):
         logger.info('Invalid character in repository name')
         return 1
 
-    repo_whitelist = config.get('DEFAULT', 'repo_whitelist')
-    if repo_whitelist:
-        if untrusted_repo_name not in repo_whitelist.split(' '):
-            logger.error('Repository not whitelisted')
-            return 1
+    # repo_whitelist = config.get('DEFAULT', 'repo_whitelist')
+    # if repo_whitelist:
+    #     if untrusted_repo_name not in repo_whitelist.split(' '):
+    #         logger.error('Repository not whitelisted')
+    #         return 1
 
     # input data sanitized
     repo_name = untrusted_repo_name
