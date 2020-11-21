@@ -25,7 +25,7 @@ import subprocess
 import sys
 import logging
 
-logger = logging.getLogger('gitlabci.ProcessGithubCommand')
+logger = logging.getLogger('gitlabci.GithubCommand')
 console_handler = logging.StreamHandler(sys.stderr)
 logger.addHandler(console_handler)
 

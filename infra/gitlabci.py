@@ -40,7 +40,7 @@ def handle(obj):
             pr_id = obj['pull_request']['number']
             base_ref = obj['pull_request']['base']['ref']
             # set target domain in qrexec policy
-            qrexec('dom0', 'gitlabci.PullRequest',
+            qrexec('dom0', 'gitlabci.GithubPullRequest',
                    '{}\n{}\n{}\n'.format(repo_name, pr_id, base_ref))
         elif 'issue' in obj:
             if obj['action'] != 'created':
@@ -51,7 +51,7 @@ def handle(obj):
             user = obj['comment']['user']['login']
             comment_body = obj['comment']['body']
             # set target domain in qrexec policy
-            qrexec('dom0', 'gitlabci.ProcessGithubCommand',
+            qrexec('dom0', 'gitlabci.GithubCommand',
                    '{}\n{}\n{}\n'.format(repo_url, user, comment_body))
 
     except KeyError:
