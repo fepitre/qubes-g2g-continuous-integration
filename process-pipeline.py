@@ -37,6 +37,13 @@ parser.add_argument('--owner', action='store', type=str, required=True,
                          '(e.g. QubesOS)')
 parser.add_argument('--pull-request', action='store', type=int, required=True,
                     help='Pullrequest number into the project')
+
+# GitlabPipelineStatus knows pipeline id status to send to Github PR
+parser.add_argument('--pipeline-id', action='store', type=int, required=False,
+                    help='Gitlab pipeline ID')
+parser.add_argument('--pipeline-status', action='store', type=str,
+                    required=False, help='Gitlab pipeline status')
+
 parser.add_argument('--verbose', action='store_true')
 parser.add_argument('--debug', action='store_true')
 
@@ -116,8 +123,10 @@ def main(args=None):
 
     github_project = None
     github_pr = None
+
+    pipeline_id = args.pipeline_id
+    pipeline_status = args.pipeline_status
     pipeline = None
-    final_status = None
 
     if args.pull_request:
         github_project = '{}/{}'.format(args.owner, args.component)
@@ -130,91 +139,60 @@ def main(args=None):
                 args.component, args.pull_request))
         return 1
 
-    pipeline_ref = 'pr-%s' % args.pull_request
+    if pipeline_id and not pipeline_status:
+        logger.error("Pipeline ID provided without status")
+        return 1
 
-    # If something was wrong at create-gitlab-branch stage, report fail status
-    if not gitlabcli.get_branch(args.owner, args.component, pipeline_ref):
-        logger.debug(
-            "Submitting fail status to Github due to missing Gitlab branch...")
+    if not pipeline_id and pipeline_status:
+        logger.error("Pipeline status provided without ID")
+        return 1
+
+    if not pipeline_id and not pipeline_status:
+        pipeline_ref = 'pr-%s' % args.pull_request
+        if not gitlabcli.get_branch(args.owner, args.component, pipeline_ref):
+            logger.error(
+                "Submitting pipeline status to Github: missing Gitlab branch.")
+            githubappcli.submit_commit_status(
+                github_project,
+                github_pr.head.sha,
+                'failure',
+                'failed',
+                '',
+                "An error occurred while creating pull request branch."
+            )
+            return 1
+
+        for _ in range(60):
+            pipeline = gitlabcli.get_pipeline(
+                args.owner, args.component, pipeline_ref)
+            if pipeline:
+                break
+            time.sleep(10)
+
+        if not pipeline:
+            logger.error(
+                "Cannot find pipeline for {} with reference 'pr-{}'".format(
+                    args.component, args.pull_request))
+            return 1
+        pipeline_id = pipeline.id
+        pipeline_status = pipeline.status
+
+    gitlab_component_url = gitlab_url + '/%s/%s' % (args.owner, args.component)
+    pipeline_url = "{}".format(get_url(gitlab_component_url, pipeline_id))
+    # Send status to Github
+    try:
+        logger.debug("Submitting pipeline status to Github...")
         githubappcli.submit_commit_status(
             github_project,
             github_pr.head.sha,
-            'failure',
-            'failed',
-            '',
-            "An error occurred while creating pull request branch."
+            gitlab_to_github_status(pipeline_status),
+            pipeline_status,
+            pipeline_url
         )
-        return 1
-
-    for _ in range(60):
-        # disgusting hack to handle legacy adding suffix for orig branch filter
-        for ref in [pipeline_ref, pipeline_ref + '-master',
-                    pipeline_ref + '-release4.0']:
-            pipeline = gitlabcli.get_pipeline(args.owner, args.component, ref)
-            if pipeline:
-                break
-        if pipeline:
-            break
-        time.sleep(10)
-
-    if not pipeline:
-        logger.error(
-            "Cannot find pipeline for {} with reference 'pr-{}'".format(
-                args.component, args.pull_request))
-        return 1
-    gitlab_component_url = gitlab_url + '/%s/%s' % (args.owner, args.component)
-    pipeline_url = "{}".format(get_url(gitlab_component_url, pipeline.id))
-
-    try:
-        if args.pull_request:
-            logger.debug("Submitting initial pipeline status to Github...")
-            githubappcli.submit_commit_status(
-                github_project,
-                github_pr.head.sha,
-                gitlab_to_github_status(pipeline.status),
-                pipeline.status,
-                pipeline_url
-            )
-
-        # In case of retry and pipeline is already done and succeeded
-        if pipeline.status != "success":
-            # Timeout of 1d
-            for _ in range(1440):
-                pipeline.refresh()
-                if pipeline.status in ('pending', 'running'):
-                    githubappcli.submit_commit_status(
-                        github_project,
-                        github_pr.head.sha,
-                        gitlab_to_github_status(pipeline.status),
-                        pipeline.status,
-                        pipeline_url
-                    )
-                    time.sleep(60)
-                else:
-                    final_status = pipeline.status
-                    break
-
-            if not final_status:
-                logger.error(
-                    "Pipeline {}: Timeout reached!".format(pipeline.id))
-                final_status = 'failure'
-
-            logger.debug("Submitting final pipeline status to Github...")
-            githubappcli.submit_commit_status(
-                github_project,
-                github_pr.head.sha,
-                gitlab_to_github_status(pipeline.status),
-                pipeline.status,
-                pipeline_url
-            )
-        else:
-            final_status = pipeline.status
-        logger.error("Pipeline {}: {}.".format(pipeline.id, final_status))
+        logger.debug("Pipeline {}: {}.".format(pipeline_id, pipeline_status))
     except Exception as e:
         logger.error(
-            "Pipeline {}: An error occurred: {}".format(pipeline.id, str(e)))
-    finally:
-        gitlabcli.delete_branch(args.owner, args.component, pipeline_ref)
+            "Pipeline {}: An error occurred: {}".format(pipeline_id, str(e)))
 
 
 if __name__ == '__main__':

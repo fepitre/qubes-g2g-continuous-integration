@@ -25,7 +25,7 @@ import subprocess
 import sys
 import logging
 
-logger = logging.getLogger('gitlabci.GithubPullRequest')
+logger = logging.getLogger('gitlabci.GitlabPipelineStatus')
 console_handler = logging.StreamHandler(sys.stderr)
 logger.addHandler(console_handler)
 
@@ -37,6 +37,10 @@ config_defaults = {
     'repo_whitelist': ''
 }
 
+GITLAB_STATUS = ('created', 'waiting_for_resource', 'preparing', 'pending',
+                 'running', 'manual', 'scheduled', 'canceled', 'skipped',
+                 'failed', 'success')
+
 
 def main(args=None):
     config_path = os.path.expanduser('~/.config/qubes/gitlabci')
@@ -46,10 +50,9 @@ def main(args=None):
 
     # input data
     untrusted_repo_full_name = sys.stdin.readline().strip()
-    untrusted_pr_number = sys.stdin.readline().strip()
-    # This is for information only as we don't need to use is as suffix for
-    # managing the CI. We have .gitlab-ci.yml file now.
-    untrusted_base_ref = sys.stdin.readline().strip()
+    untrusted_pipeline_id = sys.stdin.readline().strip()
+    untrusted_pipeline_ref = sys.stdin.readline().strip()
+    untrusted_pipeline_status = sys.stdin.readline().strip()
     (untrusted_repo_owner, untrusted_repo_name) = \
         untrusted_repo_full_name.split('/', 1)
 
@@ -60,7 +63,7 @@ def main(args=None):
     repo_owner = untrusted_repo_owner
 
     if '/' in untrusted_repo_name:
-        logger.info('Invalid character in repository name')
+        logger.error('Invalid character in repository name')
         return 1
 
     # repo_whitelist = config.get('DEFAULT', 'repo_whitelist')
@@ -69,10 +72,31 @@ def main(args=None):
     #         logger.error('Repository not whitelisted')
     #         return 1
 
+    try:
+        untrusted_pipeline_id = int(untrusted_pipeline_id)
+    except ValueError:
+        logger.error('Invalid pipeline id')
+        return 1
+
+    if not untrusted_pipeline_ref.startswith('pr-'):
+        logger.error('Invalid pipeline reference')
+        return 1
+
+    if untrusted_pipeline_status not in GITLAB_STATUS:
+        logger.error('Invalid pipeline status')
+        return 1
+
+    try:
+        pr_number = int(untrusted_pipeline_ref.replace('pr-', ''))
+    except ValueError:
+        logger.error('Invalid pipeline id')
+        return 1
+
     # input data sanitized
     repo_name = untrusted_repo_name
-    pr_number = int(untrusted_pr_number)
-    base_ref = untrusted_base_ref
+    pipeline_id = untrusted_pipeline_id
+    pipeline_ref = untrusted_pipeline_ref
+    pipeline_status = untrusted_pipeline_status
 
     command_env = os.environ.copy()
     if config.get('DEFAULT', 'github_app_id', fallback=None):
@@ -91,43 +115,27 @@ def main(args=None):
         command_env['GITLAB_API_TOKEN'] = config.get(
             'DEFAULT', 'gitlab_api_token')
 
-    logger.info('Received %s/%s (base ref: %s)', repo_name, pr_number,
-                base_ref)
+    logger.info('Received %s: Pipeline %s/%s', repo_name, pipeline_ref,
+                pipeline_status)
 
-    create_branch_cmd = [
-        '{}/create-gitlab-branch.py'.format(config.get('DEFAULT', 'home')),
-        '--clone', 'https://github.com/{}/{}'.format(repo_owner, repo_name),
-        '--push', '{}'.format('https://gitlab.com'),
-        '--repo', '{}/{}'.format('QubesOS', repo_name),
+    process_pipeline_cmd = [
+        '{}/process-pipeline.py'.format(config.get('DEFAULT', 'home')),
+        '--component', '{}'.format(repo_name),
+        '--owner', '{}'.format(repo_owner),
         '--pull-request', str(pr_number),
+        '--pipeline-id', str(pipeline_id),
+        '--pipeline-status', pipeline_status,
         '--debug'
     ]
 
-    # process_pipeline_cmd = [
-    #     '{}/process-pipeline.py'.format(config.get('DEFAULT', 'home')),
-    #     '--component', '{}'.format(repo_name),
-    #     '--owner', '{}'.format(repo_owner),
-    #     '--pull-request', str(pr_number),
-    #     '--debug'
-    # ]
-
     try:
-        subprocess.check_call(create_branch_cmd, stdin=open(os.devnull, 'r'),
+        subprocess.check_call(process_pipeline_cmd, stdin=open(os.devnull, 'r'),
                               env=command_env)
     except subprocess.CalledProcessError:
         logger.info(
-            "An error occured while creating Gitlab branch for {}/{}".format(
+            "An error occured while processing status for {}/{}".format(
                 repo_name, str(pr_number)))
         return 1
-
-    # try:
-    #     subprocess.check_call(process_pipeline_cmd, stdin=open(os.devnull, 'r'),
-    #                           env=command_env)
-    # except subprocess.CalledProcessError:
-    #     logger.info(
-    #         "An error occured while processing status for {}/{}".format(
-    #             repo_name, str(pr_number)))
-    #     return 1
 
 
 if __name__ == '__main__':

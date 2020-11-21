@@ -53,7 +53,18 @@ def handle(obj):
             # set target domain in qrexec policy
             qrexec('dom0', 'gitlabci.GithubCommand',
                    '{}\n{}\n{}\n'.format(repo_url, user, comment_body))
-
+        elif 'object_kind' in obj:
+            if obj['object_kind'] == 'pipeline':
+                repo_name = obj['project']['path_with_namespace']
+                pipeline_id = obj['object_attributes']['id']
+                pipeline_ref = obj['object_attributes']['ref']
+                if not pipeline_ref.startswith('pr-'):
+                    return
+                pipeline_status = obj['object_attributes']['status']
+                # set target domain in qrexec policy
+                qrexec('dom0', 'gitlabci.GitlabPipelineStatus',
+                       '{}\n{}\n{}\n{}\n'.format(repo_name, pipeline_id,
+                                                 pipeline_ref, pipeline_status))
     except KeyError:
         pass
 
