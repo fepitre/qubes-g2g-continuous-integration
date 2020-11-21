@@ -137,15 +137,6 @@ def main(args=None):
                 '--pull-request', str(pr_number),
                 '--debug'
             ]
-
-            # process_pipeline_cmd = [
-            #     '{}/process-pipeline.py'.format(config.get('DEFAULT', 'home')),
-            #     '--component', '{}'.format(repo_name),
-            #     '--owner', '{}'.format(repo_owner),
-            #     '--pull-request', str(pr_number),
-            #     '--debug'
-            # ]
-            # commands = [create_branch_cmd, process_pipeline_cmd]
             commands = [create_branch_cmd]
 
         try:

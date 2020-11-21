@@ -103,14 +103,6 @@ def main(args=None):
         '--debug'
     ]
 
-    # process_pipeline_cmd = [
-    #     '{}/process-pipeline.py'.format(config.get('DEFAULT', 'home')),
-    #     '--component', '{}'.format(repo_name),
-    #     '--owner', '{}'.format(repo_owner),
-    #     '--pull-request', str(pr_number),
-    #     '--debug'
-    # ]
-
     try:
         subprocess.check_call(create_branch_cmd, stdin=open(os.devnull, 'r'),
                               env=command_env)
@@ -119,15 +111,6 @@ def main(args=None):
             "An error occured while creating Gitlab branch for {}/{}".format(
                 repo_name, str(pr_number)))
         return 1
-
-    # try:
-    #     subprocess.check_call(process_pipeline_cmd, stdin=open(os.devnull, 'r'),
-    #                           env=command_env)
-    # except subprocess.CalledProcessError:
-    #     logger.info(
-    #         "An error occured while processing status for {}/{}".format(
-    #             repo_name, str(pr_number)))
-    #     return 1
 
 
 if __name__ == '__main__':
