@@ -58,8 +58,6 @@ def handle(obj):
                 repo_name = obj['project']['path_with_namespace']
                 pipeline_id = obj['object_attributes']['id']
                 pipeline_ref = obj['object_attributes']['ref']
-                if not pipeline_ref.startswith('pr-'):
-                    return
                 pipeline_status = obj['object_attributes']['status']
                 # set target domain in qrexec policy
                 qrexec('dom0', 'gitlabci.GitlabPipelineStatus',

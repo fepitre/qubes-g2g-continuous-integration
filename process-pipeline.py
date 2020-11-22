@@ -35,7 +35,11 @@ parser.add_argument('--component', action='store', type=str, required=True,
 parser.add_argument('--owner', action='store', type=str, required=True,
                     help='Owner of the project where the pullrequest is made '
                          '(e.g. QubesOS)')
-parser.add_argument('--pull-request', action='store', type=int, required=True,
+
+# reference to process: branch or pullrequest
+parser.add_argument('--branch', action='store', type=str,
+                    help='Git reference to use')
+parser.add_argument('--pull-request', action='store', type=int, required=False,
                     help='Pullrequest number into the project')
 
 # GitlabPipelineStatus knows pipeline id status to send to Github PR
@@ -81,6 +85,11 @@ def main(args=None):
     else:
         logger.setLevel(logging.ERROR)
 
+    if args.pull_request is None and args.branch is None:
+        parser.error('Either --ref or --pull-request is required')
+    if args.pull_request is not None and args.branch is not None:
+        parser.error('Only one of --ref or --pull-request can be used')
+
     gitlab_url = 'https://gitlab.com'
 
     github_app_id = os.getenv("GITHUB_APP_ID")
@@ -123,21 +132,33 @@ def main(args=None):
 
     github_project = None
     github_pr = None
+    github_ref = None
 
     pipeline_id = args.pipeline_id
     pipeline_status = args.pipeline_status
     pipeline = None
 
+    github_project = '{}/{}'.format(args.owner, args.component)
     if args.pull_request:
-        github_project = '{}/{}'.format(args.owner, args.component)
         github_pr = githubcli.get_pull_request(args.owner, args.component,
                                                args.pull_request)
 
-    if not github_pr:
-        logger.error(
-            "Cannot find Github PR for {} with reference 'pr-{}'".format(
-                args.component, args.pull_request))
-        return 1
+        if not github_pr:
+            logger.error(
+                "Cannot find Github PR for {} with reference 'pr-{}'".format(
+                    args.component, args.pull_request))
+            return 1
+
+        github_ref = github_pr.head.sha
+    else:
+        github_branch = githubcli.get_branch(args.owner, args.component,
+                                             args.branch)
+        if not github_branch:
+            logger.error(
+                "Cannot find Github branch for {} with reference '{}'".format(
+                    args.component, args.branch))
+            return 1
+        github_ref = github_branch.commit.sha
 
     if pipeline_id and not pipeline_status:
         logger.error("Pipeline ID provided without status")
@@ -154,7 +175,7 @@ def main(args=None):
                 "Submitting pipeline status to Github: missing Gitlab branch.")
             githubappcli.submit_commit_status(
                 github_project,
-                github_pr.head.sha,
+                github_ref,
                 'failure',
                 'failed',
                 '',
@@ -184,7 +205,7 @@ def main(args=None):
         logger.debug("Submitting pipeline status to Github...")
         githubappcli.submit_commit_status(
             github_project,
-            github_pr.head.sha,
+            github_ref,
             gitlab_to_github_status(pipeline_status),
             pipeline_status,
             pipeline_url

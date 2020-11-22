@@ -78,7 +78,10 @@ def main(args=None):
         logger.error('Invalid pipeline id')
         return 1
 
-    if not untrusted_pipeline_ref.startswith('pr-'):
+    if not untrusted_pipeline_ref.startswith('pr-') and \
+            not untrusted_pipeline_ref.startswith('release') and \
+            untrusted_pipeline_ref != 'master' and \
+            untrusted_pipeline_ref.endswith('-staging'):
         logger.error('Invalid pipeline reference')
         return 1
 
@@ -86,11 +89,13 @@ def main(args=None):
         logger.error('Invalid pipeline status')
         return 1
 
-    try:
-        pr_number = int(untrusted_pipeline_ref.replace('pr-', ''))
-    except ValueError:
-        logger.error('Invalid pipeline id')
-        return 1
+    pr_number = 0
+    if untrusted_pipeline_ref.startswith('pr-'):
+        try:
+            pr_number = int(untrusted_pipeline_ref.replace('pr-', ''))
+        except ValueError:
+            logger.error('Invalid pipeline id')
+            return 1
 
     # input data sanitized
     repo_name = untrusted_repo_name
@@ -122,11 +127,14 @@ def main(args=None):
         '{}/process-pipeline.py'.format(config.get('DEFAULT', 'home')),
         '--component', '{}'.format(repo_name),
         '--owner', '{}'.format(repo_owner),
-        '--pull-request', str(pr_number),
         '--pipeline-id', str(pipeline_id),
         '--pipeline-status', pipeline_status,
         '--debug'
     ]
+    if pr_number > 0:
+        process_pipeline_cmd += ['--pull-request', str(pr_number)]
+    else:
+        process_pipeline_cmd += ['--branch', pipeline_ref]
 
     try:
         subprocess.check_call(process_pipeline_cmd, stdin=open(os.devnull, 'r'),
@@ -134,7 +142,7 @@ def main(args=None):
     except subprocess.CalledProcessError:
         logger.info(
             "An error occured while processing status for {}/{}".format(
-                repo_name, str(pr_number)))
+                repo_name, pipeline_ref))
         return 1
 
 
