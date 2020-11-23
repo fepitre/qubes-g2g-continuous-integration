@@ -96,6 +96,12 @@ def main(args=None):
                     git.checkout(args.ref, branch=branch)
 
         if fetchref_found:
+            # Before pushing new branch we cancel previous running pipelines
+            # with same pr branch name
+            gitlabcli = GitlabCli(url='https://gitlab.com',
+                                  token=os.environ['GITLAB_API_TOKEN'])
+            gitlabcli.cancel_pipelines(repo_owner, repo_name, branch)
+
             logger.debug('Push to %s', repo_owner)
             git.push(repo_owner, branch, force=True)
     finally:

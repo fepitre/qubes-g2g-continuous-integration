@@ -74,11 +74,23 @@ class GitlabCli:
             pipeline.update(options)
         return self.get_project(ownner, name).pipelines.create(pipeline)
 
-    def get_pipeline(self, owner, name, ref, only_finished=False):
+    def cancel_pipelines(self, owner, name, ref):
+        for pipeline in self.get_pipelines(owner, name, ref):
+            if pipeline.status not in ('failed', 'success'):
+                pipeline.cancel()
+
+    def get_pipelines(self, owner, name, ref):
         project = self.get_project(owner, name)
+        pipelines = []
         if project:
             for pipeline in project.pipelines.list():
                 if pipeline.ref == ref:
-                    if only_finished and pipeline.status not in ('failed', 'success'):
-                        continue
-                    return pipeline
+                    pipelines.append(pipeline)
+        return pipelines
+
+    # WIP: it returns the latest in possible finished status
+    def get_pipeline(self, owner, name, ref, only_finished=False):
+        for pipeline in self.get_pipelines(owner, name, ref):
+            if only_finished and pipeline.status not in ('failed', 'success'):
+                continue
+            return pipeline
