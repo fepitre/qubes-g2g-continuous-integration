@@ -7,17 +7,16 @@ check_interval = 0
 [[runners]]
   name = ...
   output_limit = 131072
-  url = "https://gitlab.notset.fr"
+  url = "https://gitlab.com"
   token = ...
   executor = "custom"
   builds_dir = "/home/gitlab-runner/builds"
   cache_dir = "/home/gitlab-runner/cache"
-  clone_url = "https://gitlab.notset.fr"
   [runners.custom_build_dir]
   [runners.cache]
     [runners.cache.s3]
     [runners.cache.gcs]
   [runners.custom]
-    prepare_exec = "/opt/libvirt-driver/prepare.sh"
-    run_exec = "/opt/libvirt-driver/run.sh"
-    cleanup_exec = "/opt/libvirt-driver/cleanup.sh"
+    prepare_exec = "/opt/qubes-g2g-continuous-integration/runner/kvm/prepare.sh"
+    run_exec = "/opt/qubes-g2g-continuous-integration/runner/kvm/run.sh"
+    cleanup_exec = "/opt/qubes-g2g-continuous-integration/runner/kvm/cleanup.sh"
