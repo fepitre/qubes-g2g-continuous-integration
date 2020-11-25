@@ -59,10 +59,12 @@ def handle(obj):
                 pipeline_id = obj['object_attributes']['id']
                 pipeline_ref = obj['object_attributes']['ref']
                 pipeline_status = obj['object_attributes']['status']
+                pipeline_sha = obj['object_attributes']['sha']
                 # set target domain in qrexec policy
                 qrexec('dom0', 'gitlabci.GitlabPipelineStatus',
-                       '{}\n{}\n{}\n{}\n'.format(repo_name, pipeline_id,
-                                                 pipeline_ref, pipeline_status))
+                       '{}\n{}\n{}\n{}\n{}\n'.format(
+                           repo_name, pipeline_id, pipeline_ref,
+                           pipeline_status, pipeline_sha))
     except KeyError:
         pass
 

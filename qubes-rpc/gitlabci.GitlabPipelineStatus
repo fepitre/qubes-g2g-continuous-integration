@@ -53,6 +53,7 @@ def main(args=None):
     untrusted_pipeline_id = sys.stdin.readline().strip()
     untrusted_pipeline_ref = sys.stdin.readline().strip()
     untrusted_pipeline_status = sys.stdin.readline().strip()
+    untrusted_pipeline_sha = sys.stdin.readline().strip()
     (untrusted_repo_owner, untrusted_repo_name) = \
         untrusted_repo_full_name.split('/', 1)
 
@@ -89,7 +90,6 @@ def main(args=None):
         logger.error('Invalid pipeline status')
         return 1
 
-    pr_number = 0
     if untrusted_pipeline_ref.startswith('pr-'):
         try:
             pr_number = int(untrusted_pipeline_ref.replace('pr-', ''))
@@ -102,6 +102,7 @@ def main(args=None):
     pipeline_id = untrusted_pipeline_id
     pipeline_ref = untrusted_pipeline_ref
     pipeline_status = untrusted_pipeline_status
+    pipeline_sha = untrusted_pipeline_sha
 
     command_env = os.environ.copy()
     if config.get('DEFAULT', 'github_app_id', fallback=None):
@@ -129,12 +130,9 @@ def main(args=None):
         '--owner', '{}'.format(repo_owner),
         '--pipeline-id', str(pipeline_id),
         '--pipeline-status', pipeline_status,
+        '--sha', pipeline_sha,
         '--debug'
     ]
-    if pr_number > 0:
-        process_pipeline_cmd += ['--pull-request', str(pr_number)]
-    else:
-        process_pipeline_cmd += ['--branch', pipeline_ref]
 
     try:
         subprocess.check_call(process_pipeline_cmd, stdin=open(os.devnull, 'r'),

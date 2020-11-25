@@ -37,7 +37,9 @@ parser.add_argument('--owner', action='store', type=str, required=True,
                          '(e.g. QubesOS)')
 
 # reference to process: branch or pullrequest
-parser.add_argument('--branch', action='store', type=str,
+parser.add_argument('--sha', action='store', type=str, required=False,
+                    help='Git commit SHA to use')
+parser.add_argument('--branch', action='store', type=str, required=False,
                     help='Git reference to use')
 parser.add_argument('--pull-request', action='store', type=int, required=False,
                     help='Pullrequest number into the project')
@@ -85,10 +87,8 @@ def main(args=None):
     else:
         logger.setLevel(logging.ERROR)
 
-    if args.pull_request is None and args.branch is None:
-        parser.error('Either --ref or --pull-request is required')
-    if args.pull_request is not None and args.branch is not None:
-        parser.error('Only one of --ref or --pull-request can be used')
+    if args.pull_request is None and args.branch is None and args.sha is None:
+        parser.error('Please provide one of --branch, --pull-request or --sha')
 
     gitlab_url = 'https://gitlab.com'
 
@@ -130,10 +130,6 @@ def main(args=None):
     githubappcli = GithubAppCli(github_app_id, github_private_key,
                                 github_installation_id)
 
-    github_project = None
-    github_pr = None
-    github_ref = None
-
     pipeline_id = args.pipeline_id
     pipeline_status = args.pipeline_status
     pipeline = None
@@ -150,7 +146,7 @@ def main(args=None):
             return 1
 
         github_ref = github_pr.head.sha
-    else:
+    elif args.branch:
         github_branch = githubcli.get_branch(args.owner, args.component,
                                              args.branch)
         if not github_branch:
@@ -159,6 +155,23 @@ def main(args=None):
                     args.component, args.branch))
             return 1
         github_ref = github_branch.commit.sha
+    elif args.sha:
+        # sha reference /merge github reference. We need to get the parent
+        project = gitlabcli.get_project(args.owner, args.component)
+        pipeline_commit = project.commits.get(args.sha)
+        if not pipeline_commit:
+            logger.error("Cannot find commit with reference '{}': ".format(
+                args.sha))
+            return 1
+        parsed_message = pipeline_commit.message.split()
+        if parsed_message[0] == "Merge":
+            github_ref = parsed_message[1]
+        else:
+            logger.error("Cannot determine original reference to use")
+            return 1
+    else:
+        logger.error("Cannot find reference to use")
+        return 1
 
     if pipeline_id and not pipeline_status:
         logger.error("Pipeline ID provided without status")
@@ -169,6 +182,9 @@ def main(args=None):
         return 1
 
     if not pipeline_id and not pipeline_status:
+        if not args.pull_request:
+            logger.error("Pullrequest not provided")
+            return 1
         pipeline_ref = 'pr-%s' % args.pull_request
         if not gitlabcli.get_branch(args.owner, args.component, pipeline_ref):
             logger.error(
