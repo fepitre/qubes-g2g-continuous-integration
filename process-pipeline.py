@@ -167,8 +167,10 @@ def main(args=None):
         if parsed_message[0] == "Merge":
             github_ref = parsed_message[1]
         else:
-            logger.error("Cannot determine original reference to use")
-            return 1
+            logger.info("Use current SHA: not a merge reference.")
+            github_ref = args.sha
+            # logger.error("Cannot determine original reference to use")
+            # return 1
     else:
         logger.error("Cannot find reference to use")
         return 1
