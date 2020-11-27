@@ -82,7 +82,7 @@ def main(args=None):
     if not untrusted_pipeline_ref.startswith('pr-') and \
             not untrusted_pipeline_ref.startswith('release') and \
             untrusted_pipeline_ref != 'master' and \
-            untrusted_pipeline_ref.endswith('-staging'):
+            not untrusted_pipeline_ref.endswith('-staging'):
         logger.error('Invalid pipeline reference')
         return 1
 
