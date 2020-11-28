@@ -164,13 +164,14 @@ def main(args=None):
                 args.sha))
             return 1
         parsed_message = pipeline_commit.message.split()
-        if parsed_message[0] == "Merge":
+
+        if len(parsed_message) >= 3 and parsed_message[0] == "Merge" and \
+                parsed_message[2] == "into":
+            logger.info("Use parent SHA of merge reference.")
             github_ref = parsed_message[1]
         else:
-            logger.info("Use current SHA: not a merge reference.")
             github_ref = args.sha
-            # logger.error("Cannot determine original reference to use")
-            # return 1
+
     else:
         logger.error("Cannot find reference to use")
         return 1

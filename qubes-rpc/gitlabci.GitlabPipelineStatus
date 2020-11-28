@@ -90,13 +90,6 @@ def main(args=None):
         logger.error('Invalid pipeline status')
         return 1
 
-    if untrusted_pipeline_ref.startswith('pr-'):
-        try:
-            pr_number = int(untrusted_pipeline_ref.replace('pr-', ''))
-        except ValueError:
-            logger.error('Invalid pipeline id')
-            return 1
-
     # input data sanitized
     repo_name = untrusted_repo_name
     pipeline_id = untrusted_pipeline_id
