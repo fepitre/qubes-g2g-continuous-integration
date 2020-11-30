@@ -28,14 +28,7 @@ import logging
 logger = logging.getLogger('gitlabci.GitlabPipelineStatus')
 console_handler = logging.StreamHandler(sys.stderr)
 logger.addHandler(console_handler)
-
 logger.setLevel(logging.DEBUG)
-
-# defaults
-config_defaults = {
-    'owner_whitelist': 'QubesOS',
-    'repo_whitelist': ''
-}
 
 GITLAB_STATUS = ('created', 'waiting_for_resource', 'preparing', 'pending',
                  'running', 'manual', 'scheduled', 'canceled', 'skipped',
@@ -44,8 +37,7 @@ GITLAB_STATUS = ('created', 'waiting_for_resource', 'preparing', 'pending',
 
 def main(args=None):
     config_path = os.path.expanduser('~/.config/qubes/gitlabci')
-    config = configparser.RawConfigParser(
-        defaults=config_defaults, allow_no_value=True)
+    config = configparser.RawConfigParser(allow_no_value=True)
     config.read(config_path)
 
     # input data
@@ -57,8 +49,7 @@ def main(args=None):
     (untrusted_repo_owner, untrusted_repo_name) = \
         untrusted_repo_full_name.split('/', 1)
 
-    owner_whitelist = config.get('DEFAULT', 'owner_whitelist').split(' ')
-    if untrusted_repo_owner not in owner_whitelist:
+    if not config.has_section(untrusted_repo_owner):
         logger.error('Repository owner not whitelisted')
         return 1
     repo_owner = untrusted_repo_owner
@@ -67,7 +58,7 @@ def main(args=None):
         logger.error('Invalid character in repository name')
         return 1
 
-    # repo_whitelist = config.get('DEFAULT', 'repo_whitelist')
+    # repo_whitelist = config.get('repo_owner', 'repo_whitelist')
     # if repo_whitelist:
     #     if untrusted_repo_name not in repo_whitelist.split(' '):
     #         logger.error('Repository not whitelisted')
@@ -98,21 +89,24 @@ def main(args=None):
     pipeline_sha = untrusted_pipeline_sha
 
     command_env = os.environ.copy()
+    # DEFAULT config
     if config.get('DEFAULT', 'github_app_id', fallback=None):
         command_env['GITHUB_APP_ID'] = config.get(
             'DEFAULT', 'github_app_id')
     if config.get('DEFAULT', 'pem_file_path', fallback=None):
         command_env['PEM_FILE_PATH'] = config.get(
             'DEFAULT', 'pem_file_path')
-    if config.get('DEFAULT', 'github_installation_id', fallback=None):
-        command_env['GITHUB_INSTALLATION_ID'] = config.get(
-            'DEFAULT', 'github_installation_id')
     if config.get('DEFAULT', 'github_api_token', fallback=None):
         command_env['GITHUB_API_TOKEN'] = config.get(
             'DEFAULT', 'github_api_token')
     if config.get('DEFAULT', 'gitlab_api_token', fallback=None):
         command_env['GITLAB_API_TOKEN'] = config.get(
             'DEFAULT', 'gitlab_api_token')
+
+    # Per owner config
+    if config.get(repo_owner, 'github_installation_id', fallback=None):
+        command_env['GITHUB_INSTALLATION_ID'] = config.get(
+            repo_owner, 'github_installation_id')
 
     logger.info('Received %s: Pipeline %s/%s', repo_name, pipeline_ref,
                 pipeline_status)
