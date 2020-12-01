@@ -1,0 +1,244 @@
+#!/usr/bin/python3
+# -*- encoding: utf8 -*-
+#
+# The Qubes OS Project, http://www.qubes-os.org
+#
+# Copyright (C) 2020 Frédéric Pierret <frederic.pierret@qubes-os.org>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+import configparser
+import os
+import subprocess
+import sys
+import logging
+
+qubes_rpc = os.path.basename(__file__)
+
+logger = logging.getLogger(qubes_rpc.lstrip('gitlabci.'))
+console_handler = logging.StreamHandler(sys.stderr)
+logger.addHandler(console_handler)
+logger.setLevel(logging.DEBUG)
+
+
+class G2GException(Exception):
+    pass
+
+
+class G2G:
+    def __init__(self):
+        self.qubes_rpc = None
+        self.config = configparser.RawConfigParser(allow_no_value=True)
+        self.env = os.environ.copy()
+        self.data = {}
+
+    def init(self, rpc):
+        if rpc not in ('gitlabci.GithubPullRequest', 'gitlabci.GithubCommand',
+                       'gitlabci.GitlabPipelineStatus'):
+            raise G2GException('Unknown Qubes RPC: %s' % rpc)
+
+        self.qubes_rpc = rpc
+        config_path = os.path.expanduser('~/.config/qubes/gitlabci')
+        self.config.read(config_path)
+
+        # DEFAULT config
+        if self.config.get('DEFAULT', 'github_app_id', fallback=None):
+            self.env['GITHUB_APP_ID'] = self.config.get(
+                'DEFAULT', 'github_app_id')
+        if self.config.get('DEFAULT', 'pem_file_path', fallback=None):
+            self.env['PEM_FILE_PATH'] = self.config.get(
+                'DEFAULT', 'pem_file_path')
+        if self.config.get('DEFAULT', 'github_api_token', fallback=None):
+            self.env['GITHUB_API_TOKEN'] = self.config.get(
+                'DEFAULT', 'github_api_token')
+        if self.config.get('DEFAULT', 'gitlab_api_token', fallback=None):
+            self.env['GITLAB_API_TOKEN'] = self.config.get(
+                'DEFAULT', 'gitlab_api_token')
+
+    def read_input(self):
+        untrusted_data = {}
+        # input data
+        if self.qubes_rpc == 'gitlabci.GithubPullRequest':
+            untrusted_data['github_repo_full_name'] = \
+                sys.stdin.readline().strip()
+            untrusted_data['pr_number'] = sys.stdin.readline().strip()
+            untrusted_data['base_ref'] = sys.stdin.readline().strip()
+        elif self.qubes_rpc == 'gitlabci.GithubCommand':
+            untrusted_data['github_repo_url'] = sys.stdin.readline().strip()
+            untrusted_data['user'] = sys.stdin.readline().strip()
+            untrusted_data['comment_body'] = sys.stdin.readline().strip()
+        elif self.qubes_rpc == 'gitlabci.GitlabPipelineStatus':
+            untrusted_data['gitlab_repo_full_name'] = \
+                sys.stdin.readline().strip()
+            untrusted_data['pipeline_id'] = sys.stdin.readline().strip()
+            untrusted_data['pipeline_ref'] = sys.stdin.readline().strip()
+            untrusted_data['pipeline_status'] = sys.stdin.readline().strip()
+            untrusted_data['pipeline_sha'] = sys.stdin.readline().strip()
+
+        # get repositories information
+        if untrusted_data.get('github_repo_full_name', None):
+            (untrusted_data['github_repo_owner'], untrusted_data['github_repo_name']) = untrusted_data['github_repo_full_name'].split('/', 1)
+        elif untrusted_data.get('gitlab_repo_full_name', None):
+            (untrusted_data['gitlab_repo_owner'], untrusted_data['gitlab_repo_name']) = untrusted_data['gitlab_repo_full_name'].split('/', 1)
+
+            # Qubes specific: 'contrib' is a subgroup of QubesOS
+            if untrusted_data['gitlab_repo_owner'] == "QubesOS" and untrusted_data['gitlab_repo_name'].startswith('contrib/'):
+                untrusted_data['gitlab_repo_owner'] = 'QubesOS/contrib'
+                untrusted_data['gitlab_repo_name'] = untrusted_data['gitlab_repo_name'].replace('contrib/', '')
+
+                untrusted_data['github_repo_owner'] = 'QubesOS-contrib'
+                untrusted_data['github_repo_name'] = untrusted_data['gitlab_repo_name']
+            else:
+                untrusted_data['github_repo_owner'] = untrusted_data['gitlab_repo_owner']
+                untrusted_data['github_repo_name'] = untrusted_data['gitlab_repo_name']
+        elif untrusted_data.get('github_repo_url', None):
+            # example: https://api.github.com/repos/QubesOS-contrib/qubes-remote-desktop/pulls/2
+            untrusted_parsed_repo_url = \
+                untrusted_data['github_repo_url'].split('/')
+            if len(untrusted_parsed_repo_url) < 4:
+                raise G2GException('Cannot parse repo_url')
+            untrusted_data['github_repo_owner'] = untrusted_parsed_repo_url[-4]
+            untrusted_data['github_repo_name'] = untrusted_parsed_repo_url[-3]
+            untrusted_data['pr_number'] = untrusted_parsed_repo_url[-1]
+        else:
+            raise G2GException(
+                'Cannot determine origin/destination repository informations')
+
+        # sanitize data: at this point we must have every github_repo_* info
+        if not self.config.has_section(untrusted_data['github_repo_owner']):
+            raise G2GException('Github repository owner not whitelisted')
+        self.data['github_repo_owner'] = untrusted_data['github_repo_owner']
+        self.data['gitlab_repo_owner'] = untrusted_data.get(
+            'gitlab_repo_owner', self.data['github_repo_owner'])
+
+        if self.data['github_repo_owner'] == "QubesOS-contrib":
+            self.data['gitlab_repo_owner'] = "QubesOS/contrib"
+
+        # Github 'fepitre-bot' application installation ID
+        if self.config.get(self.data['github_repo_owner'],
+                           'github_installation_id', fallback=None):
+            self.env['GITHUB_INSTALLATION_ID'] = self.config.get(
+                self.data['github_repo_owner'], 'github_installation_id')
+
+        if '/' in untrusted_data['github_repo_name']:
+            raise G2GException('Invalid character in repository name')
+        self.data['github_repo_name'] = untrusted_data['github_repo_name']
+        self.data['gitlab_repo_name'] = untrusted_data.get(
+            'gitlab_repo_name', self.data['github_repo_name'])
+
+        if untrusted_data.get('pr_number', None):
+            try:
+                self.data['pr_number'] = int(untrusted_data['pr_number'])
+            except ValueError:
+                raise G2GException('Cannot determine PR number')
+
+        if untrusted_data.get('base_ref', None):
+            # WIP: sanitize on hash
+            self.data['base_ref'] = untrusted_data['base_ref']
+
+        if untrusted_data.get('pipeline_id', None):
+            try:
+                self.data['pipeline_id'] = int(untrusted_data['pipeline_id'])
+            except ValueError:
+                raise G2GException('Cannot determine PR number')
+        if untrusted_data.get('pipeline_ref', None):
+            # WIP: sanitize
+            self.data['pipeline_ref'] = untrusted_data['pipeline_ref']
+        if untrusted_data.get('pipeline_status', None):
+            # WIP: sanitize
+            self.data['pipeline_status'] = untrusted_data['pipeline_status']
+        if untrusted_data.get('pipeline_sha', None):
+            # WIP: sanitize
+            self.data['pipeline_sha'] = untrusted_data['pipeline_sha']
+
+        if untrusted_data.get('user', None):
+            user_whitelist = self.config.get(
+                self.data['github_repo_owner'], 'user_whitelist')
+            if user_whitelist and \
+                    untrusted_data['user'] not in user_whitelist.split(' '):
+                raise G2GException('User not whitelisted')
+
+        if untrusted_data.get('comment_body', None):
+            known_commands = ['PipelineRefresh', 'PipelineRetry']
+            unstrusted_parsed_commands = \
+                untrusted_data['comment_body'].split('+')
+            for cmd in unstrusted_parsed_commands:
+                if cmd not in known_commands:
+                    raise G2GException('Unknown command')
+            self.data['github_commands'] = unstrusted_parsed_commands
+
+
+def main():
+    try:
+        cli = G2G()
+        cli.init(qubes_rpc)
+        cli.read_input()
+        data = cli.data
+        logger.debug("DATA: %s" % str(data))
+        create_branch_cmd = [
+            '{}/create-gitlab-branch.py'.format(
+                cli.config.get('DEFAULT', 'home')),
+            '--clone', 'https://github.com/{}/{}'.format(
+                data['github_repo_owner'], data['github_repo_name']),
+            '--push', '{}'.format('https://gitlab.com'),
+            '--repo', '{}/{}'.format(
+                data['gitlab_repo_owner'], data['gitlab_repo_name']),
+            '--pull-request', str(data.get('pr_number', 0)),
+            '--debug'
+        ]
+
+        process_pipeline_cmd = [
+            '{}/process-pipeline.py'.format(cli.config.get('DEFAULT', 'home')),
+            '--github-component', '{}'.format(data['github_repo_name']),
+            '--github-owner', '{}'.format(data['github_repo_owner']),
+            '--gitlab-component', '{}'.format(data['gitlab_repo_name']),
+            '--gitlab-owner', '{}'.format(data['gitlab_repo_owner']),
+            '--pipeline-id', str(data.get('pipeline_id', 0)),
+            '--pipeline-status', data.get('pipeline_status', ''),
+            '--sha', data.get('pipeline_sha', ''),
+            '--debug'
+        ]
+
+        commands = []
+        if qubes_rpc == 'gitlabci.GithubCommand':
+            logger.info('%s: COMMANDS', data['github_repo_name'])
+            for github_cmd in data['github_commands']:
+                if github_cmd == 'PipelineRefresh':
+                    commands.append(process_pipeline_cmd)
+                if github_cmd == 'PipelineRetry':
+                    commands.append(create_branch_cmd)
+        elif qubes_rpc == 'gitlabci.GithubPullRequest':
+            logger.info('%s: PR %d', data['github_repo_name'],
+                        data['pr_number'])
+            commands = [create_branch_cmd]
+        elif qubes_rpc == 'gitlabci.GitlabPipelineStatus':
+            logger.info('%s: STATUS %s', data['github_repo_name'],
+                        data['pipeline_status'])
+            commands = [process_pipeline_cmd]
+
+        try:
+            for cmd in commands:
+                logger.debug('Running %s' % ' '.join(cmd))
+                subprocess.check_call(cmd, stdin=open(os.devnull, 'r'),
+                                      env=cli.env)
+        except subprocess.CalledProcessError:
+            logger.info("An error occurred while processing: %s" % qubes_rpc)
+    except G2GException as e:
+        logger.error(str(e))
+        return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())
