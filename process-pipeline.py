@@ -30,11 +30,18 @@ import time
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--component', action='store', type=str, required=True,
-                    help='Project name (e.g. qubes-linux-kernel)')
-parser.add_argument('--owner', action='store', type=str, required=True,
-                    help='Owner of the project where the pullrequest is made '
-                         '(e.g. QubesOS)')
+parser.add_argument('--github-component', action='store', type=str,
+                    required=True,
+                    help='Github project name (e.g. qubes-linux-kernel)')
+parser.add_argument('--github-owner', action='store', type=str, required=True,
+                    help='Github owner of the project where the pullrequest '
+                         'is made.')
+
+parser.add_argument('--gitlab-component', action='store', type=str,
+                    required=True,
+                    help='Gitlab project name (e.g. qubes-linux-kernel)')
+parser.add_argument('--gitlab-owner', action='store', type=str, required=True,
+                    help='Gitlab owner of the project where the pipeline is ran')
 
 # reference to process: branch or pullrequest
 parser.add_argument('--sha', action='store', type=str, required=False,
@@ -134,30 +141,31 @@ def main(args=None):
     pipeline_status = args.pipeline_status
     pipeline = None
 
-    github_project = '{}/{}'.format(args.owner, args.component)
+    github_project = '{}/{}'.format(args.github_owner, args.github_component)
     if args.pull_request:
-        github_pr = githubcli.get_pull_request(args.owner, args.component,
-                                               args.pull_request)
+        github_pr = githubcli.get_pull_request(
+            args.github_owner, args.github_component, args.pull_request)
 
         if not github_pr:
             logger.error(
                 "Cannot find Github PR for {} with reference 'pr-{}'".format(
-                    args.component, args.pull_request))
+                    args.github_component, args.github_pull_request))
             return 1
 
         github_ref = github_pr.head.sha
     elif args.branch:
-        github_branch = githubcli.get_branch(args.owner, args.component,
-                                             args.branch)
+        github_branch = githubcli.get_branch(
+            args.github_owner, args.github_component, args.branch)
         if not github_branch:
             logger.error(
                 "Cannot find Github branch for {} with reference '{}'".format(
-                    args.component, args.branch))
+                    args.github_component, args.github_branch))
             return 1
         github_ref = github_branch.commit.sha
     elif args.sha:
         # sha reference /merge github reference. We need to get the parent
-        project = gitlabcli.get_project(args.owner, args.component)
+        project = gitlabcli.get_project(
+            args.gitlab_owner, args.gitlab_component)
         pipeline_commit = project.commits.get(args.sha)
         if not pipeline_commit:
             logger.error("Cannot find commit with reference '{}': ".format(
@@ -189,7 +197,8 @@ def main(args=None):
             logger.error("Pullrequest not provided")
             return 1
         pipeline_ref = 'pr-%s' % args.pull_request
-        if not gitlabcli.get_branch(args.owner, args.component, pipeline_ref):
+        if not gitlabcli.get_branch(
+                args.gitlab_owner, args.gitlab_component, pipeline_ref):
             logger.error(
                 "Submitting pipeline status to Github: missing Gitlab branch.")
             githubappcli.submit_commit_status(
@@ -204,7 +213,7 @@ def main(args=None):
 
         for _ in range(60):
             pipeline = gitlabcli.get_pipeline(
-                args.owner, args.component, pipeline_ref)
+                args.gitlab_owner, args.gitlab_component, pipeline_ref)
             if pipeline:
                 break
             time.sleep(10)
@@ -212,12 +221,13 @@ def main(args=None):
         if not pipeline:
             logger.error(
                 "Cannot find pipeline for {} with reference 'pr-{}'".format(
-                    args.component, args.pull_request))
+                    args.gitlab_component, args.pull_request))
             return 1
         pipeline_id = pipeline.id
         pipeline_status = pipeline.status
 
-    gitlab_component_url = gitlab_url + '/%s/%s' % (args.owner, args.component)
+    gitlab_component_url = gitlab_url + '/%s/%s' % (
+        args.gitlab_owner, args.gitlab_component)
     pipeline_url = "{}".format(get_url(gitlab_component_url, pipeline_id))
     # Send status to Github
     try:

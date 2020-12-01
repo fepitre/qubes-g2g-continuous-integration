@@ -53,6 +53,14 @@ def main(args=None):
         logger.error('Repository owner not whitelisted')
         return 1
     repo_owner = untrusted_repo_owner
+    github_repo_owner = untrusted_repo_owner
+
+    # Qubes specific: 'contrib' is a subgroup of QubesOS
+    if repo_owner == "QubesOS" and untrusted_repo_name.startswith(
+            'contrib/'):
+        github_repo_owner = 'QubesOS-contrib'
+        repo_owner = 'QubesOS/contrib'
+        untrusted_repo_name = untrusted_repo_name.replace('contrib/', '')
 
     if '/' in untrusted_repo_name:
         logger.error('Invalid character in repository name')
@@ -83,6 +91,7 @@ def main(args=None):
 
     # input data sanitized
     repo_name = untrusted_repo_name
+    github_repo_name = untrusted_repo_name
     pipeline_id = untrusted_pipeline_id
     pipeline_ref = untrusted_pipeline_ref
     pipeline_status = untrusted_pipeline_status
@@ -104,17 +113,19 @@ def main(args=None):
             'DEFAULT', 'gitlab_api_token')
 
     # Per owner config
-    if config.get(repo_owner, 'github_installation_id', fallback=None):
+    if config.get(github_repo_owner, 'github_installation_id', fallback=None):
         command_env['GITHUB_INSTALLATION_ID'] = config.get(
-            repo_owner, 'github_installation_id')
+            github_repo_owner, 'github_installation_id')
 
     logger.info('Received %s: Pipeline %s/%s', repo_name, pipeline_ref,
                 pipeline_status)
 
     process_pipeline_cmd = [
         '{}/process-pipeline.py'.format(config.get('DEFAULT', 'home')),
-        '--component', '{}'.format(repo_name),
-        '--owner', '{}'.format(repo_owner),
+        '--github-component', '{}'.format(github_repo_name),
+        '--github-owner', '{}'.format(github_repo_owner),
+        '--gitlab-component', '{}'.format(repo_name),
+        '--gitlab-owner', '{}'.format(repo_owner),
         '--pipeline-id', str(pipeline_id),
         '--pipeline-status', pipeline_status,
         '--sha', pipeline_sha,

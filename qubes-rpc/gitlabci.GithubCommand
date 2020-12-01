@@ -105,6 +105,12 @@ def main(args=None):
 
     logger.debug('Commands: %s' % ';'.join(github_commands))
 
+    gitlab_repo_owner = repo_owner
+    gitlab_repo_name = repo_name
+    # Qubes specific: 'contrib' is a subgroup of QubesOS
+    if repo_owner == "QubesOS-contrib":
+        gitlab_repo_owner = 'QubesOS/contrib'
+
     # WIP: use asyncio for subprocess
     for github_cmd in github_commands:
         logger.debug('Processing %s' % github_cmd)
@@ -112,8 +118,10 @@ def main(args=None):
         if github_cmd == 'PipelineRefresh':
             process_pipeline_cmd = [
                 '{}/process-pipeline.py'.format(config.get('DEFAULT', 'home')),
-                '--component', '{}'.format(repo_name),
-                '--owner', '{}'.format(repo_owner),
+                '--github-component', '{}'.format(repo_owner),
+                '--github-owner', '{}'.format(repo_owner),
+                '--gitlab-component', '{}'.format(gitlab_repo_name),
+                '--gitlab-owner', '{}'.format(gitlab_repo_owner),
                 '--pull-request', str(pr_number),
                 '--debug'
             ]
@@ -126,7 +134,7 @@ def main(args=None):
                 '--clone',
                 'https://github.com/{}/{}'.format(repo_owner, repo_name),
                 '--push', '{}'.format('https://gitlab.com'),
-                '--repo', '{}/{}'.format(repo_owner, repo_name),
+                '--repo', '{}/{}'.format(gitlab_repo_owner, gitlab_repo_name),
                 '--pull-request', str(pr_number),
                 '--debug'
             ]
