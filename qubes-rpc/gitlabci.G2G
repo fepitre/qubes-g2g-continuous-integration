@@ -89,20 +89,29 @@ class G2G:
 
         # get repositories information
         if untrusted_data.get('github_repo_full_name', None):
-            (untrusted_data['github_repo_owner'], untrusted_data['github_repo_name']) = untrusted_data['github_repo_full_name'].split('/', 1)
+            (untrusted_data['github_repo_owner'],
+             untrusted_data['github_repo_name']
+             ) = untrusted_data['github_repo_full_name'].split('/', 1)
         elif untrusted_data.get('gitlab_repo_full_name', None):
-            (untrusted_data['gitlab_repo_owner'], untrusted_data['gitlab_repo_name']) = untrusted_data['gitlab_repo_full_name'].split('/', 1)
+            (untrusted_data['gitlab_repo_owner'],
+             untrusted_data['gitlab_repo_name']
+             ) = untrusted_data['gitlab_repo_full_name'].split('/', 1)
 
             # Qubes specific: 'contrib' is a subgroup of QubesOS
-            if untrusted_data['gitlab_repo_owner'] == "QubesOS" and untrusted_data['gitlab_repo_name'].startswith('contrib/'):
+            if untrusted_data['gitlab_repo_owner'] == "QubesOS" and \
+                    untrusted_data['gitlab_repo_name'].startswith('contrib/'):
                 untrusted_data['gitlab_repo_owner'] = 'QubesOS/contrib'
-                untrusted_data['gitlab_repo_name'] = untrusted_data['gitlab_repo_name'].replace('contrib/', '')
+                untrusted_data['gitlab_repo_name'] = \
+                    untrusted_data['gitlab_repo_name'].replace('contrib/', '')
 
                 untrusted_data['github_repo_owner'] = 'QubesOS-contrib'
-                untrusted_data['github_repo_name'] = untrusted_data['gitlab_repo_name']
+                untrusted_data['github_repo_name'] = \
+                    untrusted_data['gitlab_repo_name']
             else:
-                untrusted_data['github_repo_owner'] = untrusted_data['gitlab_repo_owner']
-                untrusted_data['github_repo_name'] = untrusted_data['gitlab_repo_name']
+                untrusted_data['github_repo_owner'] = \
+                    untrusted_data['gitlab_repo_owner']
+                untrusted_data['github_repo_name'] = \
+                    untrusted_data['gitlab_repo_name']
         elif untrusted_data.get('github_repo_url', None):
             # example: https://api.github.com/repos/QubesOS-contrib/qubes-remote-desktop/pulls/2
             untrusted_parsed_repo_url = \
