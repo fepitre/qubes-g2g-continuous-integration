@@ -199,11 +199,11 @@ def main():
         create_branch_cmd = [
             '{}/create-gitlab-branch.py'.format(
                 cli.config.get('DEFAULT', 'home')),
-            '--clone', 'https://github.com/{}/{}'.format(
-                data['github_repo_owner'], data['github_repo_name']),
-            '--push', '{}'.format('https://gitlab.com'),
-            '--repo', '{}/{}'.format(
-                data['gitlab_repo_owner'], data['gitlab_repo_name']),
+            '--github-owner', data['github_repo_owner'],
+            '--github-component', data['github_repo_name'],
+            '--gitlab-url', '{}'.format('https://gitlab.com'),
+            '--gitlab-owner', data['gitlab_repo_owner'],
+            '--gitlab-component', data['gitlab_repo_name'],
             '--pull-request', str(data.get('pr_number', 0)),
             '--debug'
         ]
@@ -240,8 +240,8 @@ def main():
         try:
             for cmd in commands:
                 logger.debug('Running %s' % ' '.join(cmd))
-                subprocess.check_call(cmd, stdin=open(os.devnull, 'r'),
-                                      env=cli.env)
+                subprocess.check_call(
+                    cmd, stdin=open(os.devnull, 'r'), env=cli.env)
         except subprocess.CalledProcessError:
             logger.info("An error occurred while processing: %s" % qubes_rpc)
     except G2GException as e:
