@@ -29,6 +29,8 @@ parser.add_argument('--gitlab-component', action='store', type=str,
                     help='Gitlab project name (e.g. qubes-linux-kernel)')
 parser.add_argument('--gitlab-owner', action='store', type=str, required=True,
                     help='Gitlab owner of the project where the pipeline is ran')
+parser.add_argument('--no-merge', action='store_true',
+                    help='Do not use /merge Github PR reference')
 parser.add_argument('--verbose', action='store_true')
 parser.add_argument('--debug', action='store_true')
 
@@ -92,7 +94,10 @@ def main(args=None):
             pass
 
         if args.pull_request:
-            remote_ref = '+refs/pull/%d/merge' % args.pull_request
+            if args.no_merge:
+                remote_ref = '+refs/pull/%d/head' % args.pull_request
+            else:
+                remote_ref = '+refs/pull/%d/merge' % args.pull_request
             ref = 'FETCH_HEAD'
 
             logger.debug('Fetch {} {}'.format('origin', remote_ref))

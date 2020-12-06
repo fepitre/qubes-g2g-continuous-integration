@@ -24,6 +24,7 @@ import os
 import subprocess
 import sys
 import logging
+import re
 
 qubes_rpc = os.path.basename(__file__)
 
@@ -181,12 +182,15 @@ class G2G:
 
         if untrusted_data.get('comment_body', None):
             known_commands = ['PipelineRefresh', 'PipelineRetry']
-            unstrusted_parsed_commands = \
-                untrusted_data['comment_body'].split('+')
-            for cmd in unstrusted_parsed_commands:
-                if cmd not in known_commands:
-                    raise G2GException('Unknown command')
-            self.data['github_commands'] = unstrusted_parsed_commands
+            unstrusted_parsed_command_args = \
+                untrusted_data['comment_body'].split('+', 1)
+            untrusted_parsed_command = unstrusted_parsed_command_args[0]
+            untrusted_parsed_args = re.sub(
+                r'[\W_]+', '', unstrusted_parsed_command_args[1])
+            if untrusted_parsed_command not in known_commands:
+                raise G2GException('Unknown command')
+            self.data['github_command'] = untrusted_parsed_command
+            self.data['github_command_args'] = untrusted_parsed_args
 
 
 def main():
@@ -223,11 +227,14 @@ def main():
         commands = []
         if qubes_rpc == 'gitlabci.GithubCommand':
             logger.info('%s: COMMANDS', data['github_repo_name'])
-            for github_cmd in data['github_commands']:
-                if github_cmd == 'PipelineRefresh':
-                    commands.append(process_pipeline_cmd)
-                if github_cmd == 'PipelineRetry':
-                    commands.append(create_branch_cmd)
+            cmd = data['github_command']
+            args = data['github_command_args']
+            if cmd == 'PipelineRefresh':
+                commands.append(process_pipeline_cmd)
+            if cmd == 'PipelineRetry':
+                if args == 'head':
+                    create_branch_cmd += ['--no-merge']
+                commands.append(create_branch_cmd)
         elif qubes_rpc == 'gitlabci.GithubPullRequest':
             logger.info('%s: PR %d', data['github_repo_name'],
                         data['pr_number'])
