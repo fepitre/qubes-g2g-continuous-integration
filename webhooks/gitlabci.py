@@ -40,8 +40,8 @@ def handle(obj):
             pr_id = obj['pull_request']['number']
             base_ref = obj['pull_request']['base']['ref']
             # set target domain in qrexec policy
-            qrexec('dom0', 'gitlabci.GithubPullRequest',
-                   '{}\n{}\n{}\n'.format(repo_name, pr_id, base_ref))
+            qrexec('dom0', 'gitlabci.G2G', '{}\n{}\n{}\n{}\n'.format(
+                       'GithubPullRequest', repo_name, pr_id, base_ref))
         elif 'issue' in obj:
             if obj['action'] != 'created':
                 return
@@ -51,8 +51,8 @@ def handle(obj):
             user = obj['comment']['user']['login']
             comment_body = obj['comment']['body']
             # set target domain in qrexec policy
-            qrexec('dom0', 'gitlabci.GithubCommand',
-                   '{}\n{}\n{}\n'.format(repo_url, user, comment_body))
+            qrexec('dom0', 'gitlabci.G2G', '{}\n{}\n{}\n{}\n'.format(
+                'GithubCommand', repo_url, user, comment_body))
         elif 'object_kind' in obj:
             if obj['object_kind'] == 'pipeline':
                 repo_name = obj['project']['path_with_namespace']
@@ -61,10 +61,10 @@ def handle(obj):
                 pipeline_status = obj['object_attributes']['status']
                 pipeline_sha = obj['object_attributes']['sha']
                 # set target domain in qrexec policy
-                qrexec('dom0', 'gitlabci.GitlabPipelineStatus',
-                       '{}\n{}\n{}\n{}\n{}\n'.format(
-                           repo_name, pipeline_id, pipeline_ref,
-                           pipeline_status, pipeline_sha))
+                qrexec('dom0', 'gitlabci.G2G',
+                       '{}\n{}\n{}\n{}\n{}\n{}\n'.format(
+                           'GitlabPipelineStatus', repo_name, pipeline_id,
+                           pipeline_ref, pipeline_status, pipeline_sha))
     except KeyError:
         pass
 

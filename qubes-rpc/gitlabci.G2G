@@ -26,9 +26,7 @@ import sys
 import logging
 import re
 
-qubes_rpc = os.path.basename(__file__)
-
-logger = logging.getLogger(qubes_rpc.lstrip('gitlabci.'))
+logger = logging.getLogger('G2G')
 console_handler = logging.StreamHandler(sys.stderr)
 logger.addHandler(console_handler)
 logger.setLevel(logging.DEBUG)
@@ -46,8 +44,8 @@ class G2G:
         self.data = {}
 
     def init(self, rpc):
-        if rpc not in ('gitlabci.GithubPullRequest', 'gitlabci.GithubCommand',
-                       'gitlabci.GitlabPipelineStatus'):
+        if rpc not in ('GithubPullRequest', 'GithubCommand',
+                       'GitlabPipelineStatus'):
             raise G2GException('Unknown Qubes RPC: %s' % rpc)
 
         self.qubes_rpc = rpc
@@ -71,16 +69,16 @@ class G2G:
     def read_input(self):
         untrusted_data = {}
         # input data
-        if self.qubes_rpc == 'gitlabci.GithubPullRequest':
+        if self.qubes_rpc == 'GithubPullRequest':
             untrusted_data['github_repo_full_name'] = \
                 sys.stdin.readline().strip()
             untrusted_data['pr_number'] = sys.stdin.readline().strip()
             untrusted_data['base_ref'] = sys.stdin.readline().strip()
-        elif self.qubes_rpc == 'gitlabci.GithubCommand':
+        elif self.qubes_rpc == 'GithubCommand':
             untrusted_data['github_repo_url'] = sys.stdin.readline().strip()
             untrusted_data['user'] = sys.stdin.readline().strip()
             untrusted_data['comment_body'] = sys.stdin.readline().strip()
-        elif self.qubes_rpc == 'gitlabci.GitlabPipelineStatus':
+        elif self.qubes_rpc == 'GitlabPipelineStatus':
             untrusted_data['gitlab_repo_full_name'] = \
                 sys.stdin.readline().strip()
             untrusted_data['pipeline_id'] = sys.stdin.readline().strip()
@@ -182,6 +180,8 @@ class G2G:
 
         if untrusted_data.get('comment_body', None):
             known_commands = ['PipelineRefresh', 'PipelineRetry']
+            untrusted_data['comment_body'] = \
+                untrusted_data['comment_body'] + '+'
             unstrusted_parsed_command_args = \
                 untrusted_data['comment_body'].split('+', 1)
             untrusted_parsed_command = unstrusted_parsed_command_args[0]
@@ -195,6 +195,8 @@ class G2G:
 
 def main():
     try:
+        qubes_rpc = sys.stdin.readline().strip()
+        logger.debug("RPC: %s" % str(qubes_rpc))
         cli = G2G()
         cli.init(qubes_rpc)
         cli.read_input()
@@ -225,7 +227,7 @@ def main():
         ]
 
         commands = []
-        if qubes_rpc == 'gitlabci.GithubCommand':
+        if qubes_rpc == 'GithubCommand':
             logger.info('%s: COMMANDS', data['github_repo_name'])
             cmd = data['github_command']
             args = data['github_command_args']
@@ -235,11 +237,11 @@ def main():
                 if args == 'head':
                     create_branch_cmd += ['--no-merge']
                 commands.append(create_branch_cmd)
-        elif qubes_rpc == 'gitlabci.GithubPullRequest':
+        elif qubes_rpc == 'GithubPullRequest':
             logger.info('%s: PR %d', data['github_repo_name'],
                         data['pr_number'])
             commands = [create_branch_cmd]
-        elif qubes_rpc == 'gitlabci.GitlabPipelineStatus':
+        elif qubes_rpc == 'GitlabPipelineStatus':
             logger.info('%s: STATUS %s', data['github_repo_name'],
                         data['pipeline_status'])
             commands = [process_pipeline_cmd]
