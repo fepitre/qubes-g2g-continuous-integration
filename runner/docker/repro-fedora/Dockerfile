@@ -8,5 +8,7 @@ COPY qubes-r4.repo /etc/yum.repos.d/
 COPY RPM-GPG-KEY-qubes-4-primary /etc/pki/rpm-gpg/
 RUN rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-qubes-4-primary
 
+RUN dnf makecache -y
+
 # cleanup
 RUN dnf clean all
