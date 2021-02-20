@@ -19,7 +19,7 @@ class GithubAppCli:
     def get_jwt(self):
         payload = {
             "iat": int(time.time()),
-            "exp": int(time.time()) + (10 * 60),
+            "exp": int(time.time()) + (9 * 60),
             "iss": self.app_id,
         }
         encoded = jwt.encode(payload, self.private_key, algorithm="RS256")
@@ -36,8 +36,8 @@ class GithubAppCli:
             'Accept': 'application/vnd.github.v3+json',
         })
         if r.status_code != 201:
-            raise Exception(
-                "GithubApp: Failed to generate token: {}".format(r.status_code))
+            raise Exception("GithubApp: Failed to generate token: {}".format(
+                r.json()['message']))
         resp = r.json()
         self.token = resp['token']
         self.expires_at = dateutil.parser.parse(resp['expires_at'])
