@@ -27,13 +27,13 @@ class GithubAppCli:
 
         return bearer_token
 
-    def gen(self):
+    def gen_token(self):
         bearer_token = self.get_jwt()
         url = 'https://api.github.com/app/installations/{}/access_tokens' \
             .format(self.installation_id)
         r = requests.post(url, headers={
-            'Authorization': 'Bearer ' + bearer_token,
-            'Accept': 'application/vnd.github.machine-man-preview+json',
+            'Authorization': 'Bearer {}'.format(bearer_token),
+            'Accept': 'application/vnd.github.v3+json',
         })
         if r.status_code != 201:
             raise Exception(
@@ -44,11 +44,11 @@ class GithubAppCli:
 
     def get_token(self):
         if not self.token:
-            self.gen()
+            self.gen_token()
         else:
             delta = datetime.now(timezone.utc) - self.expires_at
             if delta.total_seconds() <= 0:
-                self.gen()
+                self.gen_token()
 
         return self.token
 
@@ -66,8 +66,8 @@ class GithubAppCli:
             'target_url': url,
             'context': "continuous-integration/pullrequest",
         }, headers={
-            'Authorization': 'token ' + self.get_token(),
-            'Accept': 'application/vnd.github.machine-man-preview+json'
+            'Authorization': 'token {}'.format(self.get_token()),
+            'Accept': 'application/vnd.github.v3+json'
         })
         return r.status_code
 
