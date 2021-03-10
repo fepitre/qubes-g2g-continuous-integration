@@ -19,60 +19,57 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-import json
-import sys
 import subprocess
 import os
 
 
-def qrexec(vm, service, input_data=None):
-    p = subprocess.Popen(['/usr/bin/qrexec-client-vm', vm, service],
-                         stdin=subprocess.PIPE, stdout=open(os.devnull, 'w'))
-    p.communicate(input_data.encode())
+class Service:
 
-
-def handle(obj):
-    try:
-        if 'pull_request' in obj:
-            if obj['action'] not in ['opened', 'synchronize']:
-                return
-            repo_name = obj['pull_request']['base']['repo']['full_name']
-            pr_id = obj['pull_request']['number']
-            base_ref = obj['pull_request']['base']['ref']
-            # set target domain in qrexec policy
-            qrexec('dom0', 'gitlabci.G2G', '{}\n{}\n{}\n{}\n'.format(
-                       'GithubPullRequest', repo_name, pr_id, base_ref))
-        elif 'issue' in obj:
-            if obj['action'] != 'created':
-                return
-            if not obj['issue'].get('pull_request', None):
-                return
-            repo_url = obj['issue']['pull_request']['url']
-            user = obj['comment']['user']['login']
-            comment_body = obj['comment']['body']
-            # set target domain in qrexec policy
-            qrexec('dom0', 'gitlabci.G2G', '{}\n{}\n{}\n{}\n'.format(
-                'GithubCommand', repo_url, user, comment_body))
-        elif 'object_kind' in obj:
-            if obj['object_kind'] == 'pipeline':
-                repo_name = obj['project']['path_with_namespace']
-                pipeline_id = obj['object_attributes']['id']
-                pipeline_ref = obj['object_attributes']['ref']
-                pipeline_status = obj['object_attributes']['status']
-                pipeline_sha = obj['object_attributes']['sha']
-                # set target domain in qrexec policy
-                qrexec('dom0', 'gitlabci.G2G',
-                       '{}\n{}\n{}\n{}\n{}\n{}\n'.format(
-                           'GitlabPipelineStatus', repo_name, pipeline_id,
-                           pipeline_ref, pipeline_status, pipeline_sha))
-    except KeyError:
+    def __init__(self):
         pass
 
+    def qrexec(self, vm, service, input_data=None):
+        p = subprocess.Popen(['/usr/bin/qrexec-client-vm', vm, service],
+                             stdin=subprocess.PIPE,
+                             stdout=open(os.devnull, 'w'))
+        p.communicate(input_data.encode())
 
-if __name__ == '__main__':
-    obj = json.load(sys.stdin)
-    handle(obj)
-
-    print("Content-type: text/plain")
-    print("")
-    print("OK")
+    def handle(self, obj):
+        try:
+            if 'pull_request' in obj:
+                if obj['action'] not in ['opened', 'synchronize']:
+                    return
+                repo_name = obj['pull_request']['base']['repo']['full_name']
+                pr_id = obj['pull_request']['number']
+                base_ref = obj['pull_request']['base']['ref']
+                # set target domain in qrexec policy
+                self.qrexec('dom0', 'gitlabci.G2G', '{}\n{}\n{}\n{}\n'.format(
+                    'GithubPullRequest', repo_name, pr_id, base_ref))
+            elif 'issue' in obj:
+                if obj['action'] != 'created':
+                    return
+                if not obj['issue'].get('pull_request', None):
+                    return
+                repo_url = obj['issue']['pull_request']['url']
+                user = obj['comment']['user']['login']
+                comment_body = obj['comment']['body']
+                # set target domain in qrexec policy
+                self.qrexec('dom0', 'gitlabci.G2G', '{}\n{}\n{}\n{}\n'.format(
+                    'GithubCommand', repo_url, user, comment_body))
+            elif 'object_kind' in obj:
+                if obj['object_kind'] == 'pipeline':
+                    repo_name = obj['project']['path_with_namespace']
+                    pipeline_id = obj['object_attributes']['id']
+                    pipeline_ref = obj['object_attributes']['ref']
+                    pipeline_status = obj['object_attributes']['status']
+                    pipeline_sha = obj['object_attributes']['sha']
+                    # set target domain in qrexec policy
+                    self.qrexec('dom0', 'gitlabci.G2G',
+                                '{}\n{}\n{}\n{}\n{}\n{}\n'.format(
+                                    'GitlabPipelineStatus',
+                                    repo_name,
+                                    pipeline_id,
+                                    pipeline_ref, pipeline_status,
+                                    pipeline_sha))
+        except KeyError:
+            pass
