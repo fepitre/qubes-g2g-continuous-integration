@@ -17,7 +17,12 @@ class GitCli:
                                     stderr=subprocess.STDOUT)
             return result.stdout
         except subprocess.CalledProcessError as e:
-            raise GitException(str(e))
+            err = {
+                "status": str(e),
+                "stdout": e.stdout,
+                "stderr": e.stderr,
+            }
+            raise GitException(str(err))
 
     @staticmethod
     def _get_output(cmd, cwd=None):

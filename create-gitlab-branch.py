@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 from cli.git import GitCli, GitException
+from cli.github import GithubAppCli
 from cli.gitlab import GitlabCli
 
 import os
@@ -54,21 +55,51 @@ def main(args=None):
     if args.pull_request is not None and args.ref is not None:
         parser.error('Only one of --ref or --pull-request can be used')
 
-    if not os.environ.get('GITHUB_API_TOKEN', None):
-        logger.error("Cannot find GITHUB_API_TOKEN")
+    github_app_id = os.getenv("GITHUB_APP_ID")
+    pem_file_path = os.getenv("PEM_FILE_PATH")
+    github_installation_id = os.getenv("GITHUB_INSTALLATION_ID")
+    gitlab_token = os.getenv('GITLAB_API_TOKEN')
+    github_token = os.getenv('GITHUB_API_TOKEN')
+
+    if not github_app_id:
+        logger.error("Cannot find GITHUB_APP_ID!")
         return 1
 
-    if not os.environ.get('GITLAB_API_TOKEN', None):
-        logger.error("Cannot find GITLAB_API_TOKEN")
+    if not pem_file_path:
+        logger.error("Cannot find PEM_FILE_PATH!")
         return 1
 
+    if not github_installation_id:
+        logger.error("Cannot find GITHUB_INSTALLATION_ID!")
+        return 1
+
+    if not gitlab_token:
+        logger.error("Cannot find GITLAB_API_TOKEN!")
+        return 1
+
+    if not github_token:
+        logger.error("Cannot find GITHUB_API_TOKEN!")
+        return 1
+
+    try:
+        with open(pem_file_path) as fd:
+            github_private_key = fd.read().encode('utf8')
+    except:
+        logger.error("Cannot read GITHUB_PEM_FILE_PATH")
+        return 1
+
+    exit_code = 0
     tmpdir = tempfile.mkdtemp()
     try:
         git = GitCli(tmpdir)
-        github_url = 'https://github.com/{repo_owner}/{repo_name}'.format(
+        githubappcli = GithubAppCli(github_app_id, github_private_key,
+                                    github_installation_id)
+        github_token = githubappcli.get_token()
+        github_url = 'https://x-access-token:{token}@github.com/{repo_owner}/{repo_name}'.format(
+            token=github_token,
             repo_owner=args.github_owner,
             repo_name=args.github_component)
-        logger.debug('Clone %s' % github_url)
+        logger.debug('Clone %s' % github_url.replace(github_token, "******"))
         git.clone(github_url)
 
         repo_owner = args.gitlab_owner
@@ -78,11 +109,13 @@ def main(args=None):
         if args.pull_request:
             branch = 'pr-%s' % args.pull_request
 
-        url = 'https://{repo_owner}:{token}@{gitlab_url}/{repo_owner}/{repo_name}'.format(
-            token=os.environ['GITLAB_API_TOKEN'],
+        url = 'https://{repo_owner_nosubgroup}:{token}@{gitlab_url}/{repo_owner}/{repo_name}'.format(
+            token=gitlab_token,
             gitlab_url=args.gitlab_url.replace('https://', ''),
             repo_name=repo_name,
-            repo_owner=repo_owner)
+            repo_owner=repo_owner,
+            repo_owner_nosubgroup=repo_owner.split('/')[0]
+        )
 
         logger.debug('Add remote %s' % repo_owner)
         git.remote_add(repo_owner, url)
@@ -114,14 +147,18 @@ def main(args=None):
 
         # Before pushing new branch we cancel previous running pipelines
         # with same pr branch name
-        gitlabcli = GitlabCli(url='https://gitlab.com',
-                              token=os.environ['GITLAB_API_TOKEN'])
+        gitlabcli = GitlabCli(url='https://gitlab.com', token=gitlab_token)
         gitlabcli.cancel_pipelines(repo_owner, repo_name, branch)
 
         logger.debug('Push to %s', repo_owner)
         git.push(repo_owner, branch, force=True)
+    except Exception as e:
+        logger.error('An error occurred: {}'.format(str(e)))
+        exit_code = 1
     finally:
         shutil.rmtree(tmpdir)
+
+    return exit_code
 
 
 if __name__ == '__main__':
