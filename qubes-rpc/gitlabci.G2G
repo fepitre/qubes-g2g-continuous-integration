@@ -220,9 +220,6 @@ def main():
             '--github-owner', '{}'.format(data['github_repo_owner']),
             '--gitlab-component', '{}'.format(data['gitlab_repo_name']),
             '--gitlab-owner', '{}'.format(data['gitlab_repo_owner']),
-            '--pipeline-id', str(data.get('pipeline_id', 0)),
-            '--pipeline-status', data.get('pipeline_status', ''),
-            '--sha', data.get('pipeline_sha', ''),
             '--debug'
         ]
 
@@ -232,6 +229,9 @@ def main():
             cmd = data['github_command']
             args = data['github_command_args']
             if cmd == 'PipelineRefresh':
+                process_pipeline_cmd += [
+                    '--pull-request', str(data.get('pr_number', 0))
+                ]
                 commands.append(process_pipeline_cmd)
             if cmd == 'PipelineRetry':
                 if args == 'head':
@@ -244,6 +244,11 @@ def main():
         elif qubes_rpc == 'GitlabPipelineStatus':
             logger.info('%s: STATUS %s', data['github_repo_name'],
                         data['pipeline_status'])
+            process_pipeline_cmd += [
+                '--sha', data.get('pipeline_sha', ''),
+                '--pipeline-id', str(data.get('pipeline_id', 0)),
+                '--pipeline-status', data.get('pipeline_status', ''),
+            ]
             commands = [process_pipeline_cmd]
 
         try:

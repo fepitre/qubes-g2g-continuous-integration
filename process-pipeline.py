@@ -197,26 +197,26 @@ def main(args=None):
             logger.error("Pullrequest not provided")
             return 1
         pipeline_ref = 'pr-%s' % args.pull_request
-        if not gitlabcli.get_branch(
-                args.gitlab_owner, args.gitlab_component, pipeline_ref):
-            logger.error(
-                "Submitting pipeline status to Github: missing Gitlab branch.")
-            githubappcli.submit_commit_status(
-                github_project,
-                github_ref,
-                'failure',
-                'failed',
-                '',
-                "An error occurred while creating pull request branch."
-            )
-            return 1
+        # if not gitlabcli.get_branch(
+        #         args.gitlab_owner, args.gitlab_component, pipeline_ref):
+        #     logger.error(
+        #         f"Submitting pipeline status to Github: missing Gitlab branch '{pipeline_ref}'")
+        #     githubappcli.submit_commit_status(
+        #         github_project,
+        #         github_ref,
+        #         'failure',
+        #         'failed',
+        #         '',
+        #         "An error occurred while creating pull request branch."
+        #     )
+        #     return 1
 
         for _ in range(60):
             pipeline = gitlabcli.get_pipeline(
                 args.gitlab_owner, args.gitlab_component, pipeline_ref)
             if pipeline:
                 break
-            time.sleep(10)
+            time.sleep(3)
 
         if not pipeline:
             logger.error(
