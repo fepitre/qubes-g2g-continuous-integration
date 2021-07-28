@@ -110,6 +110,6 @@ class GitCli:
         self._run(cmd, self.repo)
 
     def log(self, reference):
-        cmd = 'git log --pretty=format:"%h: %<(80,trunc)%s" -1 {reference}'.format(reference=reference)
+        cmd = 'git log --pretty=format:"%h: %<(100,trunc)%s" -1 {reference}'.format(reference=reference)
         result = self._get_output(cmd, self.repo)
         return result
