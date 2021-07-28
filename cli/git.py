@@ -108,3 +108,8 @@ class GitCli:
         cmd = 'git merge {reference} --no-ff -m "{message}"'.format(
                 reference=reference, message=message)
         self._run(cmd, self.repo)
+
+    def log(self, reference):
+        cmd = 'git log --pretty=format:"%h: %<(80,trunc)%s" {reference}'.format(reference=reference)
+        result = self._get_output(cmd, self.repo)
+        return result

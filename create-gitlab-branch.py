@@ -146,7 +146,7 @@ def main(args=None):
                 logger.debug('Checkout %s' % ref)
                 git.checkout(ref, branch=branch)
 
-        logger.debug('Reference commit ID: {}'.format(git.rev_parse(ref)))
+        logger.debug('Commit: {}'.format(git.log(ref)))
 
         # Before pushing new branch we cancel previous running pipelines
         # with same pr branch name
