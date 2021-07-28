@@ -139,11 +139,14 @@ def main(args=None):
             git.checkout(ref, branch=branch)
             git.reset(ref, hard=True)
         else:
-            logger.debug('Fetch {} {}'.format('origin', args.ref))
-            git.fetch('origin', args.ref)
+            ref = args.ref
+            logger.debug('Fetch {} {}'.format('origin', ref))
+            git.fetch('origin', ref)
             if args.ref != 'master':
-                logger.debug('Checkout %s' % args.ref)
-                git.checkout(args.ref, branch=branch)
+                logger.debug('Checkout %s' % ref)
+                git.checkout(ref, branch=branch)
+
+        logger.debug('Reference commit ID: {}'.format(git.rev_parse(ref)))
 
         # Before pushing new branch we cancel previous running pipelines
         # with same pr branch name
