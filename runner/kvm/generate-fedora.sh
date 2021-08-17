@@ -2,7 +2,7 @@
 
 set -x
 
-virt-builder fedora-33 \
+virt-builder fedora-34 \
     --smp 4 \
     --memsize 4096 \
     --size 30G \
@@ -24,5 +24,4 @@ virt-builder fedora-33 \
     --run-command "echo 'DEVICE=eth0' > /etc/sysconfig/network-scripts/ifcfg-eth0" \
     --run-command "echo 'BOOTPROTO=dhcp' >> /etc/sysconfig/network-scripts/ifcfg-eth0" \
     --run-command "sed -i 's/^SELINUX=.*/SELINUX=disabled/g' /etc/selinux/config" \
-    --root-password password:root \
-    --update
+    --root-password password:root
