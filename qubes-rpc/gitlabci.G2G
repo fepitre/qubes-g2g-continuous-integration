@@ -195,6 +195,7 @@ class G2G:
     def callback(self):
         for cb in self.config.get('DEFAULT', 'callback', fallback=[]):
             try:
+                logger.debug(f"Executing {cb}")
                 subprocess.call(cb, shell=True)
             except subprocess.CalledProcessError:
                 logger.error(f"Failed to execute: {cb}")
