@@ -193,7 +193,11 @@ class G2G:
             self.data['github_command_args'] = untrusted_parsed_args
 
     def callback(self):
-        for cb in self.config.get('DEFAULT', 'callback', fallback=[]):
+        callback = self.config.get('DEFAULT', 'callback', fallback=None)
+        if not callback:
+            logger.debug("No callback defined")
+            return
+        for cb in callback.split(" "):
             try:
                 logger.debug(f"Executing {cb}")
                 subprocess.call(cb, shell=True)
