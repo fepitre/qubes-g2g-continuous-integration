@@ -1,12 +1,13 @@
 
 DOCKER_IMAGES_DIR=$(shell readlink -m $(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
-DOCKER_IMAGES = \
+DOCKER_IMAGES ?= \
 	qubesos-ci \
+	repro-bookworm \
 	repro-bullseye \
 	repro-buster \
 	repro-dom0 \
-	repro-fedora-33 \
-	repro-fedora-34
+	repro-fedora-34 \
+	repro-fedora-35
 
 .ONESHELL:
 build: $(DOCKER_IMAGES:%=build-%)

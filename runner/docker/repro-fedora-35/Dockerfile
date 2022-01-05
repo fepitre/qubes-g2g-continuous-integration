@@ -1,6 +1,7 @@
-FROM fedora:33
+FROM fedora:35
 
 RUN dnf install -y dnf-plugins-core
+RUN dnf remove -y vim-minimal
 RUN dnf install -y reprotest
 
 COPY qubes-r4.repo /etc/yum.repos.d/
