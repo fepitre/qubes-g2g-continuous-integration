@@ -1,0 +1,10 @@
+[Unit]
+Description=Start the automatic shutdown daemon
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/g2g-idle-shutdown.sh
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
