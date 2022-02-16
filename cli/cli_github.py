@@ -22,8 +22,7 @@ class GithubAppCli:
             "exp": int(time.time()) + (9 * 60),
             "iss": self.app_id,
         }
-        encoded = jwt.encode(payload, self.private_key, algorithm="RS256")
-        bearer_token = encoded.decode("utf-8")
+        bearer_token = jwt.encode(payload, self.private_key, algorithm="RS256")
 
         return bearer_token
 

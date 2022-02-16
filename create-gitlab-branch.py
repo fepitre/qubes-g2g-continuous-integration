@@ -1,8 +1,8 @@
 #!/usr/bin/python3
 
-from cli.git import GitCli, GitException
-from cli.github import GithubAppCli
-from cli.gitlab import GitlabCli
+from cli.cli_git import GitCli, GitException
+from cli.cli_github import GithubAppCli
+from cli.cli_gitlab import GitlabCli
 
 import os
 import argparse
