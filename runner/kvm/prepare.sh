@@ -47,10 +47,13 @@ for i in $(seq 1 120); do
     sleep 1s
 done
 
+# Cleanup known_hosts
+rm -f "/root/.ssh/known_hosts.old"
+ssh-keygen -f "/root/.ssh/known_hosts" -R "$VM_IP"
+
 # Wait for ssh to become available
 echo "Waiting for sshd to be available"
 for i in $(seq 1 60); do
-    ssh-keygen -f "/root/.ssh/known_hosts" -R "$VM_IP"
     if ssh -i /root/.ssh/id_rsa -o StrictHostKeyChecking=no gitlab-runner@"$VM_IP" >/dev/null 2>/dev/null; then
         break
     fi
