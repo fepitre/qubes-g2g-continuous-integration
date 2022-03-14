@@ -7,6 +7,10 @@ from datetime import datetime, timezone
 from github import Github
 
 
+class GithubError(Exception):
+    pass
+
+
 class GithubAppCli:
     def __init__(self, app_id, private_key, installation_id):
         self.app_id = app_id
@@ -28,18 +32,21 @@ class GithubAppCli:
 
     def gen_token(self):
         bearer_token = self.get_jwt()
-        url = 'https://api.github.com/app/installations/{}/access_tokens' \
-            .format(self.installation_id)
-        r = requests.post(url, headers={
-            'Authorization': 'Bearer {}'.format(bearer_token),
-            'Accept': 'application/vnd.github.v3+json',
-        })
+        url = f"https://api.github.com/app/installations/{self.installation_id}/access_tokens"
+        r = requests.post(
+            url,
+            headers={
+                "Authorization": "Bearer {}".format(bearer_token),
+                "Accept": "application/vnd.github.v3+json",
+            },
+        )
         if r.status_code != 201:
-            raise Exception("GithubApp: Failed to generate token: {}".format(
-                r.json()['message']))
+            raise Exception(
+                "GithubApp: Failed to generate token: {}".format(r.json()["message"])
+            )
         resp = r.json()
-        self.token = resp['token']
-        self.expires_at = dateutil.parser.parse(resp['expires_at'])
+        self.token = resp["token"]
+        self.expires_at = dateutil.parser.parse(resp["expires_at"])
 
     def get_token(self):
         if not self.token:
@@ -51,24 +58,28 @@ class GithubAppCli:
 
         return self.token
 
-    def submit_commit_status(self, repo_name, commit_sha, status,
-                             pipeline_status, url, description=None):
-        api_url = 'https://api.github.com/repos/{}/statuses/{}'.format(
-            repo_name,
-            commit_sha
-        )
-        if not description:
+    def submit_commit_status(
+        self, repo_name, commit_sha, status, pipeline_status=None, url=None, description=None
+    ):
+        api_url = f"https://api.github.com/repos/{repo_name}/statuses/{commit_sha}"
+        if not description and pipeline_status:
             description = "Pipeline: %s" % pipeline_status
-        r = requests.post(api_url, json={
-            'state': status,
-            'description': description,
-            'target_url': url,
-            'context': "continuous-integration/pullrequest",
-        }, headers={
-            'Authorization': 'token {}'.format(self.get_token()),
-            'Accept': 'application/vnd.github.v3+json'
-        })
-        return r.status_code
+        data = {
+            "state": status,
+            "target_url": url or "",
+            "context": "continuous-integration/pullrequest",
+        }
+        if description:
+            data["description"] = description
+        r = requests.post(
+            api_url,
+            json=data,
+            headers={
+                "Authorization": "token {}".format(self.get_token()),
+                "Accept": "application/vnd.github.v3+json",
+            },
+        )
+        return r
 
 
 class GithubCli:
@@ -77,7 +88,7 @@ class GithubCli:
         self.gi = Github(self.token)
 
     def get_repo(self, owner, project_name):
-        return self.gi.get_repo('%s/%s' % (owner, project_name))
+        return self.gi.get_repo("%s/%s" % (owner, project_name))
 
     def get_pull_request(self, owner, project_name, pull_request_id):
         project = self.get_repo(owner, project_name)
@@ -100,5 +111,5 @@ class GithubCli:
             state=status,
             target_url=url,
             description="Pipeline: %s" % pipeline_status,
-            context="continuous-integration/pullrequest"
+            context="continuous-integration/pullrequest",
         )

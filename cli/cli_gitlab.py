@@ -1,4 +1,9 @@
 import gitlab
+import gitlab.exceptions
+
+
+class GitlabCliError(Exception):
+    pass
 
 
 class GitlabCli:
@@ -90,7 +95,10 @@ class GitlabCli:
 
     # WIP: it returns the latest in possible finished status
     def get_pipeline(self, owner, name, ref, only_finished=False):
-        for pipeline in self.get_pipelines(owner, name, ref):
-            if only_finished and pipeline.status not in ('failed', 'success'):
-                continue
-            return pipeline
+        try:
+            for pipeline in self.get_pipelines(owner, name, ref):
+                if only_finished and pipeline.status not in ('failed', 'success'):
+                    continue
+                return pipeline
+        except gitlab.exceptions.GitlabError as e:
+            raise GitlabCliError(str(e)) from e
