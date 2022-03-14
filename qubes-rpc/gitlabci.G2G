@@ -252,6 +252,9 @@ def main():
         elif qubes_rpc == 'GithubPullRequest':
             logger.info('%s: PR %d', data['github_repo_name'],
                         data['pr_number'])
+            create_branch_cmd += [
+                "--base-ref", str(data["base_ref"])
+            ]
             commands = [create_branch_cmd]
         elif qubes_rpc == 'GitlabPipelineStatus':
             logger.info('%s: STATUS %s', data['github_repo_name'],

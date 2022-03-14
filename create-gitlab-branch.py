@@ -32,6 +32,8 @@ parser.add_argument('--gitlab-owner', action='store', type=str, required=True,
                     help='Gitlab owner of the project where the pipeline is ran')
 parser.add_argument('--no-merge', action='store_true',
                     help='Do not use /merge Github PR reference')
+parser.add_argument('--base-ref', action='store', type=str,
+                    help='Base reference for merge')
 parser.add_argument('--verbose', action='store_true')
 parser.add_argument('--debug', action='store_true')
 
@@ -88,12 +90,14 @@ def main(args=None):
         logger.error("Cannot read GITHUB_PEM_FILE_PATH")
         return 1
 
+    githubappcli = GithubAppCli(github_app_id, github_private_key, github_installation_id)
+    github_project = '{}/{}'.format(args.github_owner, args.github_component)
+    github_ref = None
+
     exit_code = 0
     tmpdir = tempfile.mkdtemp()
     try:
         git = GitCli(tmpdir)
-        githubappcli = GithubAppCli(github_app_id, github_private_key,
-                                    github_installation_id)
         github_token = githubappcli.get_token()
         github_url = 'https://x-access-token:{token}@github.com/{repo_owner}/{repo_name}'.format(
             token=github_token,
@@ -104,6 +108,8 @@ def main(args=None):
 
         repo_owner = args.gitlab_owner
         repo_name = args.gitlab_component
+        if not args.no_merge and not args.base_ref:
+            raise ValueError("Missing base reference for merge")
 
         branch = args.ref
         if args.pull_request:
@@ -127,26 +133,35 @@ def main(args=None):
             pass
 
         if args.pull_request:
-            if args.no_merge:
-                remote_ref = '+refs/pull/%d/head' % args.pull_request
+            head_ref = '+refs/pull/%d/head' % args.pull_request
+            logger.debug('Fetch {} {} (HEAD reference)'.format('origin', head_ref))
+            git.fetch('origin', head_ref)
+            head_sha = git.rev_parse("FETCH_HEAD")
+            github_ref = head_sha
+
+            if not args.no_merge:
+                base_ref = args.base_ref
+                logger.debug('Fetch {} {} (base reference)'.format('origin', base_ref))
+                git.fetch('origin', base_ref)
+                base_sha = git.rev_parse("FETCH_HEAD")
+
+                logger.debug('Checkout %s (base reference)' % base_ref)
+                git.checkout(base_sha, branch=branch)
+                git.reset(base_sha, hard=True)
+                git.merge(head_sha, message=f"Merge {head_sha} into {base_sha}")
             else:
-                remote_ref = '+refs/pull/%d/merge' % args.pull_request
-            ref = 'FETCH_HEAD'
-
-            logger.debug('Fetch {} {}'.format('origin', remote_ref))
-            git.fetch('origin', remote_ref)
-            logger.debug('Checkout %s' % ref)
-            git.checkout(ref, branch=branch)
-            git.reset(ref, hard=True)
+                logger.debug('Checkout %s (HEAD reference)' % head_sha)
+                git.checkout(head_sha, branch=branch)
+                git.reset(head_sha, hard=True)
         else:
-            ref = args.ref
-            logger.debug('Fetch {} {}'.format('origin', ref))
-            git.fetch('origin', ref)
+            github_ref = args.ref
+            logger.debug('Fetch {} {}'.format('origin', github_ref))
+            git.fetch('origin', github_ref)
             if args.ref != 'master':
-                logger.debug('Checkout %s' % ref)
-                git.checkout(ref, branch=branch)
+                logger.debug('Checkout %s' % github_ref)
+                git.checkout(github_ref, branch=branch)
 
-        logger.debug('Commit: {}'.format(git.log(ref)))
+        logger.debug('Commit: {}'.format(git.log(github_ref)))
 
         # Before pushing new branch we cancel previous running pipelines
         # with same pr branch name
@@ -156,7 +171,17 @@ def main(args=None):
         logger.debug('Push to %s', repo_owner)
         git.push(repo_owner, branch, force=True)
     except Exception as e:
-        logger.error('An error occurred: {}'.format(str(e)))
+        msg = str(e)
+        logger.error(f'An error occurred: {str(e)}')
+        if github_ref:
+            logger.debug("Submitting status to Github...")
+            githubappcli.submit_commit_status(
+                github_project,
+                github_ref,
+                "failure",
+                msg,
+                ""
+            )
         exit_code = 1
     finally:
         shutil.rmtree(tmpdir)

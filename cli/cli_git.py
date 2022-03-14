@@ -100,7 +100,7 @@ class GitCli:
         return re.search(r'\[GNUPG:\] TRUST_(FULLY|ULTIMATE)', result)
 
     def rev_parse(self, reference):
-        cmd = 'git rev-parse --short {reference}'.format(reference=reference)
+        cmd = 'git rev-parse {reference}'.format(reference=reference)
         result = self._get_output(cmd, self.repo)
         return result
 
