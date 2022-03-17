@@ -2,7 +2,7 @@
 import traceback
 
 from cli.cli_git import GitCli, GitException
-from cli.cli_github import GithubAppCli
+from cli.cli_github import GithubCli, GithubAppCli
 from cli.cli_gitlab import GitlabCli
 
 import os
@@ -118,6 +118,8 @@ def main(args=None):
                 github_private_key = fd.read().encode("utf8")
         except Exception as e:
             raise InternalError("Cannot read GITHUB_PEM_FILE_PATH") from e
+
+        github_cli = GithubCli(token=github_token)
         github_appcli = GithubAppCli(
             github_app_id, github_private_key, github_installation_id
         )
@@ -136,7 +138,19 @@ def main(args=None):
 
         repo_owner = args.gitlab_owner
         repo_name = args.gitlab_component
-        if not args.no_merge and not args.base_ref:
+
+        github_pr = github_cli.get_pull_request(
+            args.github_owner, args.github_component, args.pull_request
+        )
+
+        if not github_pr:
+            raise InternalError(
+                "Cannot find Github PR for {} with reference 'pr-{}'".format(
+                    args.github_component, args.pull_request
+                )
+            )
+        base_ref = args.base_ref or github_pr.base.ref
+        if not args.no_merge and not base_ref:
             raise InternalError("Missing base reference for merge")
 
         branch = args.ref
@@ -169,7 +183,6 @@ def main(args=None):
 
             if not args.no_merge:
                 base_sha = None
-                base_ref = args.base_ref
                 try:
 
                     logger.debug(
