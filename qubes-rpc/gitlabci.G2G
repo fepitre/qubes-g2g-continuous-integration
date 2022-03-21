@@ -20,20 +20,376 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 import configparser
+import logging
 import os
+import re
 import subprocess
 import sys
-import logging
-import re
+import tempfile
+import time
+from datetime import datetime, timezone
 
-logger = logging.getLogger('G2G')
+import dateutil.parser
+import jwt
+import requests
+from github import Github
+import gitlab
+
+
+logger = logging.getLogger("G2G")
 console_handler = logging.StreamHandler(sys.stderr)
 logger.addHandler(console_handler)
 logger.setLevel(logging.DEBUG)
 
 
-class G2GException(Exception):
+class GitException(Exception):
     pass
+
+
+class GithubError(Exception):
+    pass
+
+
+class GitlabCliError(Exception):
+    pass
+
+
+class G2GError(Exception):
+    pass
+
+
+class InternalError(G2GError):
+    pass
+
+
+class GitCli:
+    def __init__(self, repo):
+        self.repo = repo
+
+    @staticmethod
+    def _run(cmd, cwd=None):
+        try:
+            result = subprocess.run(
+                cmd, shell=True, cwd=cwd, check=True, stderr=subprocess.STDOUT
+            )
+            return result.stdout
+        except subprocess.CalledProcessError as e:
+            err = {
+                "status": str(e),
+                "stdout": e.stdout,
+                "stderr": e.stderr,
+            }
+            raise GitException(str(err))
+
+    @staticmethod
+    def _get_output(cmd, cwd=None):
+        try:
+            result = subprocess.check_output(
+                cmd, shell=True, cwd=cwd, stderr=subprocess.STDOUT
+            )
+            return result.decode("utf-8").rstrip("\n")
+        except subprocess.CalledProcessError as e:
+            raise GitException(str(e))
+
+    def clone(
+        self,
+        source,
+        branch=None,
+        username="fepitre-bot",
+        useremail="fepitre-bot@qubes-os.org",
+    ):
+        if branch:
+            repo = "git clone -b {branch} {src} {dst}"
+        else:
+            repo = "git clone {src} {dst}"
+        cmd = repo.format(src=source, dst=self.repo, branch=branch)
+        cmd_config_name = 'git config user.name "%s"' % username
+        cmd_config_email = "git config user.email %s" % useremail
+
+        self._run(cmd)
+        self._run(cmd_config_name, self.repo)
+        self._run(cmd_config_email, self.repo)
+
+    def delete_remote_branch(self, source, branch):
+        cmd = "git push {source} --delete {branch}".format(source=source, branch=branch)
+        self._run(cmd, self.repo)
+
+    def reset(self, ref, hard=False):
+        if hard:
+            cmd = "git reset --hard {ref}".format(ref=ref)
+        else:
+            cmd = "git reset {ref}".format(ref=ref)
+        self._run(cmd, self.repo)
+
+    def fetch(self, source, branch="master"):
+        cmd = "git fetch {source} --tags {branch}".format(source=source, branch=branch)
+        self._run(cmd, self.repo)
+
+    def push(self, remote, branch="master", force=False):
+        if force:
+            cmd = "git push -f -u {remote} {branch}".format(
+                remote=remote, branch=branch
+            )
+        else:
+            cmd = "git push -u {remote} {branch}".format(remote=remote, branch=branch)
+        self._run(cmd, self.repo)
+
+    def checkout(self, ref, branch=None):
+        if branch:
+            cmd = "git checkout -b {branch} {ref}".format(branch=branch, ref=ref)
+        else:
+            cmd = "git checkout {ref}".format(ref=ref)
+        self._run(cmd, self.repo)
+
+    def remote_add(self, remote_name, url):
+        cmd = "git remote add {remote_name} {url}".format(
+            remote_name=remote_name, url=url
+        )
+        self._run(cmd, self.repo)
+
+    def tags(self, ref):
+        cmd = 'git tag --points-at="{ref}"'.format(ref=ref)
+        result = self._get_output(cmd, self.repo)
+        tags = result.split("\n")
+        return tags
+
+    def verify_tag(self, tag, keyrings):
+        cmd = (
+            "GNUPGHOME={keyrings} git -c gpg.program=gpg verify-tag --raw {tag}".format(
+                keyrings=keyrings, tag=tag
+            )
+        )
+        result = self._get_output(cmd, self.repo)
+        return re.search(r"\[GNUPG:\] TRUST_(FULLY|ULTIMATE)", result)
+
+    def rev_parse(self, reference):
+        cmd = "git rev-parse {reference}".format(reference=reference)
+        result = self._get_output(cmd, self.repo)
+        return result
+
+    def merge(self, reference, message):
+        cmd = 'git merge {reference} --no-ff -m "{message}"'.format(
+            reference=reference, message=message
+        )
+        self._run(cmd, self.repo)
+
+    def log(self, reference):
+        cmd = 'git log --pretty=format:"%h: %<(100,trunc)%s" -1 {reference}'.format(
+            reference=reference
+        )
+        result = self._get_output(cmd, self.repo)
+        return result
+
+
+class GithubAppCli:
+    def __init__(self, app_id, private_key, installation_id):
+        self.app_id = app_id
+        self.private_key = private_key
+        self.installation_id = installation_id
+
+        self.token = None
+        self.expires_at = 0
+
+    def get_jwt(self):
+        payload = {
+            "iat": int(time.time()),
+            "exp": int(time.time()) + (9 * 60),
+            "iss": self.app_id,
+        }
+        bearer_token = jwt.encode(payload, self.private_key, algorithm="RS256")
+
+        return bearer_token
+
+    def gen_token(self):
+        bearer_token = self.get_jwt()
+        url = f"https://api.github.com/app/installations/{self.installation_id}/access_tokens"
+        r = requests.post(
+            url,
+            headers={
+                "Authorization": "Bearer {}".format(bearer_token),
+                "Accept": "application/vnd.github.v3+json",
+            },
+        )
+        if r.status_code != 201:
+            raise GithubError(
+                "GithubApp: Failed to generate token: {}".format(r.json()["message"])
+            )
+        resp = r.json()
+        self.token = resp["token"]
+        self.expires_at = dateutil.parser.parse(resp["expires_at"])
+
+    def get_token(self):
+        if not self.token:
+            self.gen_token()
+        else:
+            delta = datetime.now(timezone.utc) - self.expires_at
+            if delta.total_seconds() <= 0:
+                self.gen_token()
+
+        return self.token
+
+    def submit_commit_status(
+        self,
+        repo_name,
+        commit_sha,
+        status,
+        pipeline_status=None,
+        url=None,
+        description=None,
+    ):
+        api_url = f"https://api.github.com/repos/{repo_name}/statuses/{commit_sha}"
+        if not description and pipeline_status:
+            description = "Pipeline: %s" % pipeline_status
+        data = {
+            "state": status,
+            "target_url": url or "",
+            "context": "continuous-integration/pullrequest",
+        }
+        if description:
+            data["description"] = description
+        r = requests.post(
+            api_url,
+            json=data,
+            headers={
+                "Authorization": "token {}".format(self.get_token()),
+                "Accept": "application/vnd.github.v3+json",
+            },
+        )
+        return r
+
+
+class GithubCli:
+    def __init__(self, token):
+        self.token = token
+        self.gi = Github(self.token)
+
+    def get_repo(self, owner, project_name):
+        return self.gi.get_repo("%s/%s" % (owner, project_name))
+
+    def get_pull_request(self, owner, project_name, pull_request_id):
+        project = self.get_repo(owner, project_name)
+        if project:
+            for pr in project.get_pulls():
+                if str(pr.number) == str(pull_request_id):
+                    return pr
+
+    def get_branch(self, owner, project_name, branch):
+        project = self.get_repo(owner, project_name)
+        if project:
+            try:
+                return project.get_branch(branch)
+            except:
+                return None
+
+    @staticmethod
+    def set_status(project, sha, status, pipeline_status, url):
+        project.get_commit(sha).create_status(
+            state=status,
+            target_url=url,
+            description="Pipeline: %s" % pipeline_status,
+            context="continuous-integration/pullrequest",
+        )
+
+
+class GitlabCli:
+    def __init__(self, url, token):
+        self.token = token
+        self.gl = gitlab.Gitlab(url=url, private_token=token)
+
+    def delete_branch(self, owner, name, branch_name):
+        project = self.get_project(owner, name)
+        for branch in project.branches.list():
+            if branch.name == branch_name:
+                branch.delete()
+
+    def get_branch(self, owner, name, branch_name):
+        project = self.get_project(owner, name)
+        for branch in project.branches.list():
+            if branch.name == branch_name:
+                return branch
+
+    def get_runner(self, name):
+        runners = self.gl.runners.list()
+        for runner in runners:
+            # desc is referring the hostname
+            if runner.description == name:
+                return runner
+
+    def add_runner(self, owner, name, runner_name):
+        project = self.get_project(owner, name)
+        runner = self.get_runner(runner_name)
+        if project and runner:
+            if runner not in project.runners.list():
+                project.runners.create({"runner_id": runner.id})
+
+    def remove_runner(self, owner, name, runner_name):
+        project = self.get_project(owner, name)
+        runner = self.get_runner(runner_name)
+        if project and runner:
+            if runner in project.runners.list():
+                project.runners.delete(runner.id)
+
+    def get_project(self, owner, name):
+        projects = self.gl.projects.list(search=name)
+        # in case of common name acting as suffix like 'qubes-builder'
+        # it will return 'qubes-builder*' matching repository names
+        for project in projects:
+            if project.attributes["path_with_namespace"] == "%s/%s" % (owner, name):
+                return project
+
+    def remove_project(self, ownner, name):
+        project = self.get_project(ownner, name)
+        if project:
+            self.gl.projects.delete(project.id)
+
+    def create_project(self, name, group=None, options=None):
+        project = {"name": name}
+        if options:
+            project.update(options)
+
+        # for a group
+        if group:
+            group_id = self.gl.groups.list(search=group)[0].id
+            project["namespace_id"] = group_id
+
+        return self.gl.projects.create(project)
+
+    def create_pipeline(self, ownner, name, options=None):
+        pipeline = {"ref": "master"}
+        if options:
+            pipeline.update(options)
+        return self.get_project(ownner, name).pipelines.create(pipeline)
+
+    def cancel_pipelines(self, owner, name, ref):
+        for pipeline in self.get_pipelines(owner, name, ref):
+            if pipeline.status not in ("failed", "success"):
+                pipeline.cancel()
+
+    def get_pipelines(self, owner, name, ref):
+        project = self.get_project(owner, name)
+        pipelines = []
+        if project:
+            for pipeline in project.pipelines.list():
+                if pipeline.ref == ref:
+                    pipelines.append(pipeline)
+        return pipelines
+
+    def get_pipeline_by_id(self, owner, name, pipeline_id):
+        project = self.get_project(owner, name)
+        if project:
+            for pipeline in project.pipelines.list():
+                if str(pipeline.id) == str(pipeline_id):
+                    return pipeline
+
+    # WIP: it returns the latest in possible finished status
+    def get_pipeline(self, owner, name, ref, only_finished=False):
+        try:
+            for pipeline in self.get_pipelines(owner, name, ref):
+                if only_finished and pipeline.status not in ("failed", "success"):
+                    continue
+                return pipeline
+        except gitlab.exceptions.GitlabError as e:
+            raise GitlabCliError(str(e)) from e
 
 
 class G2G:
@@ -44,241 +400,510 @@ class G2G:
         self.data = {}
 
     def init(self, rpc):
-        if rpc not in ('GithubPullRequest', 'GithubCommand',
-                       'GitlabPipelineStatus'):
-            raise G2GException('Unknown Qubes RPC: %s' % rpc)
+        if rpc not in ("GithubPullRequest", "GithubCommand", "GitlabPipelineStatus"):
+            raise G2GError("Unknown Qubes RPC: %s" % rpc)
 
         self.qubes_rpc = rpc
-        config_path = os.path.expanduser('~/.config/qubes/gitlabci')
+        config_path = os.path.expanduser("~/.config/qubes/gitlabci")
         self.config.read(config_path)
-
-        # DEFAULT config
-        if self.config.get('DEFAULT', 'github_app_id', fallback=None):
-            self.env['GITHUB_APP_ID'] = self.config.get(
-                'DEFAULT', 'github_app_id')
-        if self.config.get('DEFAULT', 'pem_file_path', fallback=None):
-            self.env['PEM_FILE_PATH'] = self.config.get(
-                'DEFAULT', 'pem_file_path')
-        if self.config.get('DEFAULT', 'github_api_token', fallback=None):
-            self.env['GITHUB_API_TOKEN'] = self.config.get(
-                'DEFAULT', 'github_api_token')
-        if self.config.get('DEFAULT', 'gitlab_api_token', fallback=None):
-            self.env['GITLAB_API_TOKEN'] = self.config.get(
-                'DEFAULT', 'gitlab_api_token')
 
     def read_input(self):
         untrusted_data = {}
         # input data
-        if self.qubes_rpc == 'GithubPullRequest':
-            untrusted_data['github_repo_full_name'] = \
-                sys.stdin.readline().strip()
-            untrusted_data['pr_number'] = sys.stdin.readline().strip()
-            untrusted_data['base_ref'] = sys.stdin.readline().strip()
-        elif self.qubes_rpc == 'GithubCommand':
-            untrusted_data['github_repo_url'] = sys.stdin.readline().strip()
-            untrusted_data['user'] = sys.stdin.readline().strip()
-            untrusted_data['comment_body'] = sys.stdin.readline().strip()
-        elif self.qubes_rpc == 'GitlabPipelineStatus':
-            untrusted_data['gitlab_repo_full_name'] = \
-                sys.stdin.readline().strip()
-            untrusted_data['pipeline_id'] = sys.stdin.readline().strip()
-            untrusted_data['pipeline_ref'] = sys.stdin.readline().strip()
-            untrusted_data['pipeline_status'] = sys.stdin.readline().strip()
-            untrusted_data['pipeline_sha'] = sys.stdin.readline().strip()
+        if self.qubes_rpc == "GithubPullRequest":
+            untrusted_data["github_repo_full_name"] = sys.stdin.readline().strip()
+            untrusted_data["pr_number"] = sys.stdin.readline().strip()
+            untrusted_data["base_ref"] = sys.stdin.readline().strip()
+        elif self.qubes_rpc == "GithubCommand":
+            untrusted_data["github_repo_url"] = sys.stdin.readline().strip()
+            untrusted_data["user"] = sys.stdin.readline().strip()
+            untrusted_data["comment_body"] = sys.stdin.readline().strip()
+        elif self.qubes_rpc == "GitlabPipelineStatus":
+            untrusted_data["gitlab_repo_full_name"] = sys.stdin.readline().strip()
+            untrusted_data["pipeline_id"] = sys.stdin.readline().strip()
+            untrusted_data["pipeline_ref"] = sys.stdin.readline().strip()
+            untrusted_data["pipeline_status"] = sys.stdin.readline().strip()
+            untrusted_data["pipeline_sha"] = sys.stdin.readline().strip()
 
         # get repositories information
-        if untrusted_data.get('github_repo_full_name', None):
-            (untrusted_data['github_repo_owner'],
-             untrusted_data['github_repo_name']
-             ) = untrusted_data['github_repo_full_name'].split('/', 1)
-        elif untrusted_data.get('gitlab_repo_full_name', None):
-            (untrusted_data['gitlab_repo_owner'],
-             untrusted_data['gitlab_repo_name']
-             ) = untrusted_data['gitlab_repo_full_name'].split('/', 1)
+        if untrusted_data.get("github_repo_full_name", None):
+            (
+                untrusted_data["github_repo_owner"],
+                untrusted_data["github_repo_name"],
+            ) = untrusted_data["github_repo_full_name"].split("/", 1)
+        elif untrusted_data.get("gitlab_repo_full_name", None):
+            (
+                untrusted_data["gitlab_repo_owner"],
+                untrusted_data["gitlab_repo_name"],
+            ) = untrusted_data["gitlab_repo_full_name"].split("/", 1)
 
             # Qubes specific: 'contrib' is a subgroup of QubesOS
-            if untrusted_data['gitlab_repo_owner'] == "QubesOS" and \
-                    untrusted_data['gitlab_repo_name'].startswith('contrib/'):
-                untrusted_data['gitlab_repo_owner'] = 'QubesOS/contrib'
-                untrusted_data['gitlab_repo_name'] = \
-                    untrusted_data['gitlab_repo_name'].replace('contrib/', '')
+            if untrusted_data["gitlab_repo_owner"] == "QubesOS" and untrusted_data[
+                "gitlab_repo_name"
+            ].startswith("contrib/"):
+                untrusted_data["gitlab_repo_owner"] = "QubesOS/contrib"
+                untrusted_data["gitlab_repo_name"] = untrusted_data[
+                    "gitlab_repo_name"
+                ].replace("contrib/", "")
 
-                untrusted_data['github_repo_owner'] = 'QubesOS-contrib'
-                untrusted_data['github_repo_name'] = \
-                    untrusted_data['gitlab_repo_name']
+                untrusted_data["github_repo_owner"] = "QubesOS-contrib"
+                untrusted_data["github_repo_name"] = untrusted_data["gitlab_repo_name"]
             else:
-                untrusted_data['github_repo_owner'] = \
-                    untrusted_data['gitlab_repo_owner']
-                untrusted_data['github_repo_name'] = \
-                    untrusted_data['gitlab_repo_name']
-        elif untrusted_data.get('github_repo_url', None):
+                untrusted_data["github_repo_owner"] = untrusted_data[
+                    "gitlab_repo_owner"
+                ]
+                untrusted_data["github_repo_name"] = untrusted_data["gitlab_repo_name"]
+        elif untrusted_data.get("github_repo_url", None):
             # example: https://api.github.com/repos/QubesOS-contrib/qubes-remote-desktop/pulls/2
-            untrusted_parsed_repo_url = \
-                untrusted_data['github_repo_url'].split('/')
+            untrusted_parsed_repo_url = untrusted_data["github_repo_url"].split("/")
             if len(untrusted_parsed_repo_url) < 4:
-                raise G2GException('Cannot parse repo_url')
-            untrusted_data['github_repo_owner'] = untrusted_parsed_repo_url[-4]
-            untrusted_data['github_repo_name'] = untrusted_parsed_repo_url[-3]
-            untrusted_data['pr_number'] = untrusted_parsed_repo_url[-1]
+                raise G2GError("Cannot parse repo_url")
+            untrusted_data["github_repo_owner"] = untrusted_parsed_repo_url[-4]
+            untrusted_data["github_repo_name"] = untrusted_parsed_repo_url[-3]
+            untrusted_data["pr_number"] = untrusted_parsed_repo_url[-1]
         else:
-            raise G2GException(
-                'Cannot determine origin/destination repository informations')
+            raise G2GError(
+                "Cannot determine origin/destination repository informations"
+            )
 
         # sanitize data: at this point we must have every github_repo_* info
-        if not self.config.has_section(untrusted_data['github_repo_owner']):
-            raise G2GException('Github repository owner not whitelisted')
-        self.data['github_repo_owner'] = untrusted_data['github_repo_owner']
-        self.data['gitlab_repo_owner'] = untrusted_data.get(
-            'gitlab_repo_owner', self.data['github_repo_owner'])
+        if not self.config.has_section(untrusted_data["github_repo_owner"]):
+            raise G2GError("Github repository owner not whitelisted")
+        self.data["github_repo_owner"] = untrusted_data["github_repo_owner"]
+        self.data["gitlab_repo_owner"] = untrusted_data.get(
+            "gitlab_repo_owner", self.data["github_repo_owner"]
+        )
 
-        if self.data['github_repo_owner'] == "QubesOS-contrib":
-            self.data['gitlab_repo_owner'] = "QubesOS/contrib"
+        if self.data["github_repo_owner"] == "QubesOS-contrib":
+            self.data["gitlab_repo_owner"] = "QubesOS/contrib"
 
         # Github 'fepitre-bot' application installation ID
-        if self.config.get(self.data['github_repo_owner'],
-                           'github_installation_id', fallback=None):
-            self.env['GITHUB_INSTALLATION_ID'] = self.config.get(
-                self.data['github_repo_owner'], 'github_installation_id')
+        if self.config.get(
+            self.data["github_repo_owner"], "github_installation_id", fallback=None
+        ):
+            self.env["GITHUB_INSTALLATION_ID"] = self.config.get(
+                self.data["github_repo_owner"], "github_installation_id"
+            )
 
-        if '/' in untrusted_data['github_repo_name']:
-            raise G2GException('Invalid character in repository name')
-        self.data['github_repo_name'] = untrusted_data['github_repo_name']
-        self.data['gitlab_repo_name'] = untrusted_data.get(
-            'gitlab_repo_name', self.data['github_repo_name'])
+        if "/" in untrusted_data["github_repo_name"]:
+            raise G2GError("Invalid character in repository name")
+        self.data["github_repo_name"] = untrusted_data["github_repo_name"]
+        self.data["gitlab_repo_name"] = untrusted_data.get(
+            "gitlab_repo_name", self.data["github_repo_name"]
+        )
 
-        if untrusted_data.get('pr_number', None):
+        if untrusted_data.get("pr_number", None):
             try:
-                self.data['pr_number'] = int(untrusted_data['pr_number'])
+                self.data["pr_number"] = int(untrusted_data["pr_number"])
             except ValueError:
-                raise G2GException('Cannot determine PR number')
+                raise G2GError("Cannot determine PR number")
 
-        if untrusted_data.get('base_ref', None):
+        if untrusted_data.get("base_ref", None):
             # WIP: sanitize on hash
-            self.data['base_ref'] = untrusted_data['base_ref']
+            self.data["base_ref"] = untrusted_data["base_ref"]
 
-        if untrusted_data.get('pipeline_id', None):
+        if untrusted_data.get("pipeline_id", None):
             try:
-                self.data['pipeline_id'] = int(untrusted_data['pipeline_id'])
+                self.data["pipeline_id"] = int(untrusted_data["pipeline_id"])
             except ValueError:
-                raise G2GException('Cannot determine PR number')
-        if untrusted_data.get('pipeline_ref', None):
+                raise G2GError("Cannot determine PR number")
+        if untrusted_data.get("pipeline_ref", None):
             # WIP: sanitize
-            self.data['pipeline_ref'] = untrusted_data['pipeline_ref']
-        if untrusted_data.get('pipeline_status', None):
+            self.data["pipeline_ref"] = untrusted_data["pipeline_ref"]
+        if untrusted_data.get("pipeline_status", None):
             # WIP: sanitize
-            self.data['pipeline_status'] = untrusted_data['pipeline_status']
-        if untrusted_data.get('pipeline_sha', None):
+            self.data["pipeline_status"] = untrusted_data["pipeline_status"]
+        if untrusted_data.get("pipeline_sha", None):
             # WIP: sanitize
-            self.data['pipeline_sha'] = untrusted_data['pipeline_sha']
+            self.data["pipeline_sha"] = untrusted_data["pipeline_sha"]
 
-        if untrusted_data.get('user', None):
+        if untrusted_data.get("user", None):
             user_whitelist = self.config.get(
-                self.data['github_repo_owner'], 'user_whitelist')
-            if user_whitelist and \
-                    untrusted_data['user'] not in user_whitelist.split(' '):
-                raise G2GException('User not whitelisted')
+                self.data["github_repo_owner"], "user_whitelist"
+            )
+            if user_whitelist and untrusted_data["user"] not in user_whitelist.split(
+                " "
+            ):
+                raise G2GError("User not whitelisted")
 
-        if untrusted_data.get('comment_body', None):
-            known_commands = ['PipelineRefresh', 'PipelineRetry']
-            untrusted_data['comment_body'] = \
-                untrusted_data['comment_body'] + '+'
-            unstrusted_parsed_command_args = \
-                untrusted_data['comment_body'].split('+', 1)
+        if untrusted_data.get("comment_body", None):
+            known_commands = ["PipelineRefresh", "PipelineRetry"]
+            untrusted_data["comment_body"] = untrusted_data["comment_body"] + "+"
+            unstrusted_parsed_command_args = untrusted_data["comment_body"].split(
+                "+", 1
+            )
             untrusted_parsed_command = unstrusted_parsed_command_args[0]
             untrusted_parsed_args = re.sub(
-                r'[\W_]+', '', unstrusted_parsed_command_args[1])
+                r"[\W_]+", "", unstrusted_parsed_command_args[1]
+            )
             if untrusted_parsed_command not in known_commands:
-                raise G2GException('Unknown command')
-            self.data['github_command'] = untrusted_parsed_command
-            self.data['github_command_args'] = untrusted_parsed_args
+                raise G2GError("Unknown command")
+            self.data["github_command"] = untrusted_parsed_command
+            self.data["github_command_args"] = untrusted_parsed_args
 
     def callback(self):
-        callback = self.config.get('DEFAULT', 'callback', fallback=None)
+        callback = self.config.get("DEFAULT", "callback", fallback=None)
         if not callback:
             logger.debug("No callback defined")
             return
         for cb in callback.split(" "):
             try:
                 logger.debug(f"Executing {cb}")
-                subprocess.call(cb, shell=True)
+                subprocess.run(cb, check=True, env=self.env)
             except subprocess.CalledProcessError:
                 logger.error(f"Failed to execute: {cb}")
+
+
+def gitlab_to_github_status(status):
+    if status in (
+        "created",
+        "waiting_for_resource",
+        "preparing",
+        "pending",
+        "running",
+        "manual",
+        "scheduled",
+    ):
+        return "pending"
+
+    if status in ("canceled", "skipped"):
+        return "error"
+
+    if status == "failed":
+        return "failure"
+
+    if status == "success":
+        return status
+
+
+def get_url(gitlab_url, pipeline_id):
+    return f"{gitlab_url}/-/pipelines/{pipeline_id}"
+
+
+def create_gitlab_branch(
+    g2g_cli,
+    github_cli,
+    github_app_cli,
+    github_owner,
+    github_component,
+    gitlab_cli,
+    gitlab_owner,
+    gitlab_component,
+    pull_request,
+    base_ref=None,
+    no_merge=False,
+    **kwargs,
+):
+    logger.info("Create Gitlab Branch")
+    tmpdir = tempfile.mkdtemp()
+
+    git_cli = GitCli(tmpdir)
+
+    github_pr = github_cli.get_pull_request(
+        github_owner, github_component, pull_request
+    )
+
+    if not github_pr:
+        raise InternalError(
+            f"Cannot find Github PR for {github_component} with reference 'pr-{pull_request}'"
+        )
+
+    github_token = github_app_cli.get_token()
+    github_url = f"https://x-access-token:{github_token}@github.com/{github_owner}/{github_component}"
+
+    logger.debug(f"Clone {github_url.replace(github_token, '******')}")
+    git_cli.clone(github_url)
+
+    base_ref = base_ref or github_pr.base.ref
+    if not no_merge and not base_ref:
+        raise InternalError("Missing base reference for merge")
+
+    gitlab_branch = f"pr-{pull_request}"
+    gitlab_url = f"https://{gitlab_owner.split('/')[0]}:{gitlab_cli.token}@gitlab.com/{gitlab_owner}/{gitlab_component}"
+
+    logger.debug(f"Add remote {gitlab_owner}")
+    git_cli.remote_add(gitlab_owner, gitlab_url)
+
+    logger.debug(f"Delete remote branch {gitlab_branch}")
+    try:
+        git_cli.delete_remote_branch(gitlab_owner, gitlab_branch)
+    except GitException:
+        pass
+
+    head_ref = f"+refs/pull/{pull_request}/head"
+    logger.debug(f"Fetch origin {head_ref} (HEAD reference)")
+    git_cli.fetch("origin", head_ref)
+    head_sha = git_cli.rev_parse("FETCH_HEAD")
+    github_ref = head_sha
+
+    if not no_merge:
+        base_sha = None
+        try:
+            logger.debug(f"Fetch origin {base_ref} (base reference)")
+            git_cli.fetch("origin", base_ref)
+            base_sha = git_cli.rev_parse("FETCH_HEAD")
+
+            logger.debug(f"Checkout {base_ref} (base reference)")
+            git_cli.checkout(base_sha, branch=gitlab_branch)
+            git_cli.reset(base_sha, hard=True)
+            git_cli.merge(head_sha, message=f"Merge {head_sha} into {base_sha}")
+        except Exception as e:
+            if base_sha:
+                msg = f"Failed to merge {head_sha[:8]} into {base_sha[:8]}"
+            else:
+                msg = f"Failed to merge {head_sha[:8]} into {base_ref}"
+            if github_app_cli and github_ref:
+                logger.debug(f"Submitting PR status (ref={github_ref},status='failed')")
+                result = github_app_cli.submit_commit_status(
+                    repo_name=f"{github_owner}/{github_component}",
+                    commit_sha=github_ref,
+                    status="failure",
+                    description=msg,
+                )
+                if result.status_code > 400:
+                    logger.error(
+                        f"Failed to send PR status: {result.text} (status-code={result.status_code})"
+                    )
+            raise InternalError(msg) from e
+    else:
+        logger.debug(f"Checkout {head_sha} (HEAD reference)")
+        git_cli.checkout(head_sha, branch=gitlab_branch)
+        git_cli.reset(head_sha, hard=True)
+
+    logger.debug(f"Commit: {git_cli.log(github_ref)}")
+
+    # Before pushing new branch we cancel previous running pipelines
+    # with same pr branch name
+    logger.debug(f"Push to {gitlab_owner}")
+    gitlab_cli.cancel_pipelines(gitlab_owner, gitlab_component, gitlab_branch)
+    git_cli.push(gitlab_owner, gitlab_branch, force=True)
+
+    # Trigger callback scripts
+    g2g_cli.callback()
+
+
+def process_pipeline(
+    g2g_cli,
+    github_cli,
+    github_app_cli,
+    github_owner,
+    github_component,
+    gitlab_cli,
+    gitlab_owner,
+    gitlab_component,
+    pipeline_id,
+    pipeline_status,
+    pull_request=None,
+    branch=None,
+    sha=None,
+    **kwargs,
+):
+    logger.info("Process Pipeline")
+    pipeline = None
+
+    if pull_request:
+        github_pr = github_cli.get_pull_request(
+            github_owner, github_component, pull_request
+        )
+
+        if not github_pr:
+            raise InternalError(
+                f"Cannot find Github PR for {github_component} with reference 'pr-{pull_request}'"
+            )
+
+        github_ref = github_pr.head.sha
+    elif branch:
+        github_branch = github_cli.get_branch(github_owner, github_component, branch)
+        if not github_branch:
+            raise InternalError(
+                f"Cannot find Github branch for {github_component} with reference '{github_branch}'"
+            )
+        github_ref = github_branch.commit.sha
+    elif sha:
+        # sha reference /merge github reference. We need to get the parent
+        project = gitlab_cli.get_project(gitlab_owner, gitlab_component)
+        pipeline_commit = project.commits.get(sha)
+        if not pipeline_commit:
+            raise InternalError("Cannot find commit with reference '{}': ".format(sha))
+        parsed_message = pipeline_commit.message.split()
+
+        if (
+            len(parsed_message) >= 3
+            and parsed_message[0] == "Merge"
+            and parsed_message[2] == "into"
+        ):
+            logger.info("Use parent SHA of merge reference.")
+            github_ref = parsed_message[1]
+        else:
+            github_ref = sha
+
+    else:
+        raise InternalError("Cannot find reference to use")
+
+    if pipeline_id and not pipeline_status:
+        raise InternalError("Pipeline ID provided without status")
+
+    if not pipeline_id and pipeline_status:
+        raise InternalError("Pipeline status provided without ID")
+
+    if not pipeline_id and not pipeline_status:
+        if not pull_request:
+            raise InternalError("Pullrequest not provided")
+        pipeline_ref = f"pr-{pull_request}"
+
+        for _ in range(60):
+            try:
+                pipeline = gitlab_cli.get_pipeline(
+                    gitlab_owner, gitlab_component, pipeline_ref
+                )
+            except GitlabCliError as e:
+                raise InternalError("Failed to get pipeline") from e
+            if pipeline:
+                break
+            time.sleep(3)
+
+        if not pipeline:
+            raise InternalError(
+                f"Cannot find pipeline for {gitlab_component} with reference 'pr-{pull_request}'"
+            )
+        pipeline_id = pipeline.id
+        pipeline_status = pipeline.status
+
+    gitlab_component_url = f"https://gitlab.com/{gitlab_owner}/{gitlab_component}"
+    pipeline_url = get_url(gitlab_component_url, pipeline_id)
+
+    # Send status to Github
+    try:
+        status = gitlab_to_github_status(pipeline_status)
+        msg = f"Submitting PR status (ref={github_ref},pipeline={pipeline_id},status={status},pipeline_status={pipeline_status})"
+        logger.debug(msg)
+        result = github_app_cli.submit_commit_status(
+            f"{github_owner}/{github_component}",
+            github_ref,
+            status,
+            pipeline_status,
+            pipeline_url,
+        )
+        if result.status_code > 400:
+            raise InternalError(str(result.text))
+    except Exception as e:
+        raise InternalError(f"Failed to submit pullrequest status ({str(e)})") from e
+
+    # Get pipeline jobs runner tags
+    if not pipeline:
+        pipeline = gitlab_cli.get_pipeline_by_id(
+            gitlab_owner, gitlab_component, pipeline_id
+        )
+    if pipeline:
+        tags = []
+        for j in pipeline.jobs.list():
+            tags += j.tag_list
+        ci_runner_tags = " ".join(list(set(tags)))
+        logger.debug(f"RUNNER TAGS: {ci_runner_tags}")
+        g2g_cli.env.update({"CI_RUNNER_TAGS": ci_runner_tags})
+    else:
+        logger.error(f"Cannot find pipeline with id {pipeline_id}")
+
+    # Trigger callback scripts
+    g2g_cli.callback()
 
 
 def main():
     try:
         qubes_rpc = sys.stdin.readline().strip()
         logger.debug("RPC: %s" % str(qubes_rpc))
+
         cli = G2G()
         cli.init(qubes_rpc)
         cli.read_input()
+
         data = cli.data
         logger.debug("DATA: %s" % str(data))
-        create_branch_cmd = [
-            '{}/create-gitlab-branch.py'.format(
-                cli.config.get('DEFAULT', 'home')),
-            '--github-owner', data['github_repo_owner'],
-            '--github-component', data['github_repo_name'],
-            '--gitlab-url', '{}'.format('https://gitlab.com'),
-            '--gitlab-owner', data['gitlab_repo_owner'],
-            '--gitlab-component', data['gitlab_repo_name'],
-            '--pull-request', str(data.get('pr_number', 0)),
-            '--debug'
-        ]
 
-        process_pipeline_cmd = [
-            '{}/process-pipeline.py'.format(cli.config.get('DEFAULT', 'home')),
-            '--github-component', '{}'.format(data['github_repo_name']),
-            '--github-owner', '{}'.format(data['github_repo_owner']),
-            '--gitlab-component', '{}'.format(data['gitlab_repo_name']),
-            '--gitlab-owner', '{}'.format(data['gitlab_repo_owner']),
-            '--debug'
-        ]
+        github_app_id = cli.config.get("DEFAULT", "github_app_id")
+        pem_file_path = cli.config.get("DEFAULT", "pem_file_path")
+        gitlab_token = cli.config.get("DEFAULT", "gitlab_api_token")
+        github_token = cli.config.get("DEFAULT", "github_api_token")
 
-        commands = []
-        if qubes_rpc == 'GithubCommand':
-            logger.info('%s: COMMANDS', data['github_repo_name'])
-            cmd = data['github_command']
-            args = data['github_command_args']
-            if cmd == 'PipelineRefresh':
-                process_pipeline_cmd += [
-                    '--pull-request', str(data.get('pr_number', 0))
-                ]
-                commands.append(process_pipeline_cmd)
-            if cmd == 'PipelineRetry':
-                if args == 'head':
-                    create_branch_cmd += ['--no-merge']
-                commands.append(create_branch_cmd)
-        elif qubes_rpc == 'GithubPullRequest':
-            logger.info('%s: PR %d', data['github_repo_name'],
-                        data['pr_number'])
-            create_branch_cmd += [
-                "--base-ref", str(data["base_ref"])
-            ]
-            commands = [create_branch_cmd]
-        elif qubes_rpc == 'GitlabPipelineStatus':
-            logger.info('%s: STATUS %s', data['github_repo_name'],
-                        data['pipeline_status'])
-            process_pipeline_cmd += [
-                '--sha', data.get('pipeline_sha', ''),
-                '--pipeline-id', str(data.get('pipeline_id', 0)),
-                '--pipeline-status', data.get('pipeline_status', ''),
-            ]
-            commands = [process_pipeline_cmd]
+        github_installation_id = cli.config.get(
+            data["github_repo_owner"], "github_installation_id"
+        )
+
+        if not github_app_id:
+            raise InternalError("Cannot find GITHUB_APP_ID!")
+
+        if not pem_file_path:
+            raise InternalError("Cannot find PEM_FILE_PATH!")
+
+        if not github_installation_id:
+            raise InternalError("Cannot find GITHUB_INSTALLATION_ID!")
+
+        if not gitlab_token:
+            raise InternalError("Cannot find GITLAB_API_TOKEN!")
+
+        if not github_token:
+            raise InternalError("Cannot find GITHUB_API_TOKEN!")
 
         try:
-            for cmd in commands:
-                logger.debug('Running %s' % ' '.join(cmd))
-                subprocess.check_call(
-                    cmd, stdin=open(os.devnull, 'r'), env=cli.env)
-            # Trigger callback scripts
-            cli.callback()
-        except subprocess.CalledProcessError:
-            logger.info("An error occurred while processing: %s" % qubes_rpc)
-    except G2GException as e:
+            with open(pem_file_path) as fd:
+                github_private_key = fd.read().encode("utf8")
+        except Exception as e:
+            raise InternalError("Cannot read GITHUB_PEM_FILE_PATH") from e
+
+        github_cli = GithubCli(token=github_token)
+        github_app_cli = GithubAppCli(
+            github_app_id, github_private_key, github_installation_id
+        )
+        gitlab_cli = GitlabCli(url="https://gitlab.com", token=gitlab_token)
+
+        base_args = {
+            "g2g_cli": cli,
+            "github_cli": github_cli,
+            "github_app_cli": github_app_cli,
+            "github_owner": data["github_repo_owner"],
+            "github_component": data["github_repo_name"],
+            "gitlab_cli": gitlab_cli,
+            "gitlab_owner": data["gitlab_repo_owner"],
+            "gitlab_component": data["gitlab_repo_name"],
+        }
+        create_gitlab_branch_args = process_pipeline_args = base_args
+
+        create_gitlab_branch_args.update(
+            {
+                "pull_request": data.get("pr_number", 0),
+                "base_ref": data.get("base_ref", None),
+            }
+        )
+
+        process_pipeline_args.update(
+            {
+                "pipeline_id": data.get("pipeline_id", 0),
+                "pipeline_status": data.get("pipeline_status", ""),
+            }
+        )
+
+        if qubes_rpc == "GithubCommand":
+            logger.info(f"{data['github_repo_name']}: COMMANDS")
+            cmd = data["github_command"]
+            args = data["github_command_args"]
+            if cmd == "PipelineRefresh":
+                process_pipeline_args["pull_request"] = str(data.get("pr_number", 0))
+                process_pipeline(**process_pipeline_args)
+            elif cmd == "PipelineRetry":
+                if args == "head":
+                    create_gitlab_branch_args["no-merge"] = True
+                create_gitlab_branch(**create_gitlab_branch_args)
+        elif qubes_rpc == "GithubPullRequest":
+            logger.info(f"{data['github_repo_name']}: PR {data['pr_number']}")
+            create_gitlab_branch(**create_gitlab_branch_args)
+        elif qubes_rpc == "GitlabPipelineStatus":
+            logger.info(f"{data['github_repo_name']}: STATUS {data['pipeline_status']}")
+            process_pipeline_args["sha"] = data.get("pipeline_sha", "")
+            process_pipeline(**process_pipeline_args)
+    except G2GError as e:
         logger.error(str(e))
         return 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())
