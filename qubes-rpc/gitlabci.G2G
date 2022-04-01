@@ -70,7 +70,7 @@ class GitCli:
     def _run(cmd, cwd=None):
         try:
             result = subprocess.run(
-                cmd, shell=True, cwd=cwd, check=True, stderr=subprocess.STDOUT
+                cmd, shell=True, cwd=cwd, check=True, capture_output=True,
             )
             return result.stdout
         except subprocess.CalledProcessError as e:
@@ -80,16 +80,6 @@ class GitCli:
                 "stderr": e.stderr,
             }
             raise GitException(str(err))
-
-    @staticmethod
-    def _get_output(cmd, cwd=None):
-        try:
-            result = subprocess.check_output(
-                cmd, shell=True, cwd=cwd, stderr=subprocess.STDOUT
-            )
-            return result.decode("utf-8").rstrip("\n")
-        except subprocess.CalledProcessError as e:
-            raise GitException(str(e))
 
     def clone(
         self,
@@ -149,7 +139,7 @@ class GitCli:
 
     def tags(self, ref):
         cmd = 'git tag --points-at="{ref}"'.format(ref=ref)
-        result = self._get_output(cmd, self.repo)
+        result = self._run(cmd, self.repo).decode("utf-8").rstrip("\n")
         tags = result.split("\n")
         return tags
 
@@ -159,12 +149,12 @@ class GitCli:
                 keyrings=keyrings, tag=tag
             )
         )
-        result = self._get_output(cmd, self.repo)
+        result = self._run(cmd, self.repo).decode("utf-8").rstrip("\n")
         return re.search(r"\[GNUPG:\] TRUST_(FULLY|ULTIMATE)", result)
 
     def rev_parse(self, reference):
         cmd = "git rev-parse {reference}".format(reference=reference)
-        result = self._get_output(cmd, self.repo)
+        result = self._run(cmd, self.repo).decode("utf-8").rstrip("\n")
         return result
 
     def merge(self, reference, message):
@@ -177,7 +167,7 @@ class GitCli:
         cmd = 'git log --pretty=format:"%h: %<(100,trunc)%s" -1 {reference}'.format(
             reference=reference
         )
-        result = self._get_output(cmd, self.repo)
+        result = self._run(cmd, self.repo).decode("utf-8").rstrip("\n")
         return result
 
 
