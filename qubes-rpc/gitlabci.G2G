@@ -63,11 +63,11 @@ class InternalError(G2GError):
 
 
 class GitCli:
-    def __init__(self, repo):
+    def __init__(self, repo, private = None):
         self.repo = repo
+        self.private = private or []
 
-    @staticmethod
-    def _run(cmd, cwd=None):
+    def _run(self, cmd, cwd=None):
         try:
             result = subprocess.run(
                 cmd, shell=True, cwd=cwd, check=True, capture_output=True,
@@ -79,7 +79,10 @@ class GitCli:
                 "stdout": e.stdout,
                 "stderr": e.stderr,
             }
-            raise GitException(str(err))
+            err = str(err)
+            for p in self.private:
+                err = err.replace(p, '******')
+            raise GitException()
 
     def clone(
         self,
@@ -587,8 +590,6 @@ def create_gitlab_branch(
     logger.info("Create Gitlab Branch")
     tmpdir = tempfile.mkdtemp()
 
-    git_cli = GitCli(tmpdir)
-
     github_pr = github_cli.get_pull_request(
         github_owner, github_component, pull_request
     )
@@ -600,6 +601,8 @@ def create_gitlab_branch(
 
     github_token = github_app_cli.get_token()
     github_url = f"https://x-access-token:{github_token}@github.com/{github_owner}/{github_component}"
+
+    git_cli = GitCli(tmpdir, private=[github_token])
 
     logger.debug(f"Clone {github_url.replace(github_token, '******')}")
     git_cli.clone(github_url)
