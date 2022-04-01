@@ -23,6 +23,7 @@ import configparser
 import logging
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -63,14 +64,19 @@ class InternalError(G2GError):
 
 
 class GitCli:
-    def __init__(self, repo, private = None):
+    def __init__(self, repo, private=None):
         self.repo = repo
         self.private = private or []
 
     def _run(self, cmd, cwd=None):
+        cwd = cwd or self.repo
         try:
             result = subprocess.run(
-                cmd, shell=True, cwd=cwd, check=True, capture_output=True,
+                cmd,
+                shell=True,
+                cwd=cwd,
+                check=True,
+                capture_output=True,
             )
             return result.stdout
         except subprocess.CalledProcessError as e:
@@ -81,7 +87,7 @@ class GitCli:
             }
             err = str(err)
             for p in self.private:
-                err = err.replace(p, '******')
+                err = err.replace(p, "******")
             raise GitException()
 
     def clone(
@@ -100,23 +106,23 @@ class GitCli:
         cmd_config_email = "git config user.email %s" % useremail
 
         self._run(cmd)
-        self._run(cmd_config_name, self.repo)
-        self._run(cmd_config_email, self.repo)
+        self._run(cmd_config_name)
+        self._run(cmd_config_email)
 
     def delete_remote_branch(self, source, branch):
         cmd = "git push {source} --delete {branch}".format(source=source, branch=branch)
-        self._run(cmd, self.repo)
+        self._run(cmd)
 
     def reset(self, ref, hard=False):
         if hard:
             cmd = "git reset --hard {ref}".format(ref=ref)
         else:
             cmd = "git reset {ref}".format(ref=ref)
-        self._run(cmd, self.repo)
+        self._run(cmd)
 
     def fetch(self, source, branch="master"):
         cmd = "git fetch {source} --tags {branch}".format(source=source, branch=branch)
-        self._run(cmd, self.repo)
+        self._run(cmd)
 
     def push(self, remote, branch="master", force=False):
         if force:
@@ -125,24 +131,24 @@ class GitCli:
             )
         else:
             cmd = "git push -u {remote} {branch}".format(remote=remote, branch=branch)
-        self._run(cmd, self.repo)
+        self._run(cmd)
 
     def checkout(self, ref, branch=None):
         if branch:
             cmd = "git checkout -b {branch} {ref}".format(branch=branch, ref=ref)
         else:
             cmd = "git checkout {ref}".format(ref=ref)
-        self._run(cmd, self.repo)
+        self._run(cmd)
 
     def remote_add(self, remote_name, url):
         cmd = "git remote add {remote_name} {url}".format(
             remote_name=remote_name, url=url
         )
-        self._run(cmd, self.repo)
+        self._run(cmd)
 
     def tags(self, ref):
         cmd = 'git tag --points-at="{ref}"'.format(ref=ref)
-        result = self._run(cmd, self.repo).decode("utf-8").rstrip("\n")
+        result = self._run(cmd).decode("utf-8").rstrip("\n")
         tags = result.split("\n")
         return tags
 
@@ -152,25 +158,25 @@ class GitCli:
                 keyrings=keyrings, tag=tag
             )
         )
-        result = self._run(cmd, self.repo).decode("utf-8").rstrip("\n")
+        result = self._run(cmd).decode("utf-8").rstrip("\n")
         return re.search(r"\[GNUPG:\] TRUST_(FULLY|ULTIMATE)", result)
 
     def rev_parse(self, reference):
         cmd = "git rev-parse {reference}".format(reference=reference)
-        result = self._run(cmd, self.repo).decode("utf-8").rstrip("\n")
+        result = self._run(cmd).decode("utf-8").rstrip("\n")
         return result
 
     def merge(self, reference, message):
         cmd = 'git merge {reference} --no-ff -m "{message}"'.format(
             reference=reference, message=message
         )
-        self._run(cmd, self.repo)
+        self._run(cmd)
 
     def log(self, reference):
         cmd = 'git log --pretty=format:"%h: %<(100,trunc)%s" -1 {reference}'.format(
             reference=reference
         )
-        result = self._run(cmd, self.repo).decode("utf-8").rstrip("\n")
+        result = self._run(cmd).decode("utf-8").rstrip("\n")
         return result
 
 
@@ -574,6 +580,7 @@ def get_url(gitlab_url, pipeline_id):
 
 
 def create_gitlab_branch(
+    tmpdir,
     g2g_cli,
     github_cli,
     github_app_cli,
@@ -588,7 +595,6 @@ def create_gitlab_branch(
     **kwargs,
 ):
     logger.info("Create Gitlab Branch")
-    tmpdir = tempfile.mkdtemp()
 
     github_pr = github_cli.get_pull_request(
         github_owner, github_component, pull_request
@@ -802,6 +808,8 @@ def process_pipeline(
 
 
 def main():
+    tmpdir = None
+    exit_code = 0
     try:
         qubes_rpc = sys.stdin.readline().strip()
         logger.debug("RPC: %s" % str(qubes_rpc))
@@ -849,6 +857,8 @@ def main():
         )
         gitlab_cli = GitlabCli(url="https://gitlab.com", token=gitlab_token)
 
+        tmpdir = tempfile.mkdtemp()
+
         base_args = {
             "g2g_cli": cli,
             "github_cli": github_cli,
@@ -863,6 +873,7 @@ def main():
 
         create_gitlab_branch_args.update(
             {
+                "tmpdir": tmpdir,
                 "pull_request": data.get("pr_number", 0),
                 "base_ref": data.get("base_ref", None),
             }
@@ -895,7 +906,11 @@ def main():
             process_pipeline(**process_pipeline_args)
     except G2GError as e:
         logger.error(str(e))
-        return 1
+        exit_code = 1
+    finally:
+        if tmpdir:
+            shutil.rmtree(tmpdir)
+        return exit_code
 
 
 if __name__ == "__main__":
