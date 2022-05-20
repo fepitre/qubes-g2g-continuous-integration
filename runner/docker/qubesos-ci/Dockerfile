@@ -9,7 +9,8 @@ RUN dnf -y install git curl sudo passwd grub2-tools devscripts debootstrap \
   libxml2-devel libxslt-devel rubygem-bundler jekyll ShellCheck pylint \
   python3-pip python3-gobject e2fsprogs ca-certificates which \
   python3-requests-mock python3-pytest python3-pytest-mock python3-pytest-cov \
-  python3-podman python3-yaml python3-click python3-docker podman docker gpg rpm-sign
+  python3-podman python3-yaml python3-click python3-docker podman docker gpg rpm-sign tree \
+  python3-pathspec python3-packaging
 RUN dnf clean all
 
 RUN useradd -m -p "" gitlab-runner -s /bin/bash
