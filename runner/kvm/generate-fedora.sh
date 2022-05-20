@@ -11,7 +11,7 @@ virt-builder fedora-35 \
     --hostname gitlab-runner-fedora \
     --network \
     --run-command "rm -rf /etc/yum.repos.d/*modular*.repo /etc/yum.repos.d/fedora-cisco-openh264.repo; " \
-    --install git,git-lfs,openssh-server,curl,sudo,passwd,grub2-tools,devscripts,debootstrap,pbuilder,python3-sh,wget,createrepo,rpm,yum,yum-utils,mock,rsync,rpmdevtools,rpm-build,perl-Digest-MD5,perl-Digest-SHA,python3-pyyaml,hunspell,pandoc,jq,rubygems,ruby-devel,gcc-c++,pkg-config,libxml2,libxslt,libxml2-devel,libxslt-devel,rubygem-bundler,python3-pip,cryptsetup,python3-packaging,createrepo_c,devscripts,gpg,python3-pyyaml,docker,python3-docker,podman,python3-podman,reprepro,docker-compose,rpm-sign,xterm-resize,vim,python3-pathspec \
+    --install git,git-lfs,openssh-server,curl,sudo,passwd,grub2-tools,devscripts,debootstrap,pbuilder,python3-sh,wget,createrepo,rpm,yum,yum-utils,mock,rsync,rpmdevtools,rpm-build,perl-Digest-MD5,perl-Digest-SHA,python3-pyyaml,hunspell,pandoc,jq,rubygems,ruby-devel,gcc-c++,pkg-config,libxml2,libxslt,libxml2-devel,libxslt-devel,rubygem-bundler,python3-pip,cryptsetup,python3-packaging,createrepo_c,devscripts,gpg,python3-pyyaml,docker,python3-docker,podman,python3-podman,reprepro,docker-compose,rpm-sign,xterm-resize,vim,python3-pathspec,python3-lxml \
     --run-command "curl -L --output /usr/local/bin/gitlab-runner https://gitlab-runner-downloads.s3.amazonaws.com/latest/binaries/gitlab-runner-linux-amd64" \
     --run-command "chmod +x /usr/local/bin/gitlab-runner" \
     --run-command 'useradd -m -p "" gitlab-runner -s /bin/bash' \
@@ -26,4 +26,5 @@ virt-builder fedora-35 \
     --run-command "sed -i 's/^SELINUX=.*/SELINUX=disabled/g' /etc/selinux/config" \
     --run-command "usermod -aG docker gitlab-runner" \
     --run-command "systemctl enable docker" \
+    --run-command "cd /tmp && git clone https://github.com/qubesos/qubes-infrastructure-mirrors && cd qubes-infrastructure-mirrors && python3 setup.py build install" \
     --root-password password:root

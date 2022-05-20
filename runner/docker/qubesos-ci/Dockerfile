@@ -9,7 +9,7 @@ RUN dnf -y install git curl sudo passwd grub2-tools devscripts debootstrap \
   python3-pip python3-gobject e2fsprogs ca-certificates which \
   python3-requests-mock python3-pytest python3-pytest-mock python3-pytest-cov \
   python3-podman python3-yaml python3-click python3-docker podman docker gpg rpm-sign tree \
-  python3-pathspec python3-packaging python3-debian
+  python3-pathspec python3-packaging python3-debian python3-lxml
 RUN dnf clean all
 
 RUN useradd -m -p "" gitlab-runner -s /bin/bash
@@ -18,5 +18,7 @@ RUN echo 'gitlab-runner ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 # debootstrap: workaround until upstream merge it
 # https://salsa.debian.org/installer-team/debootstrap/-/merge_requests/26/
 RUN sed -i 's@if \! doing_variant fakechroot\; then@if \! doing_variant fakechroot \&\& [ \"$CONTAINER\" \!= docker ]\; then@g' /usr/share/debootstrap/scripts/debian-common /usr/share/debootstrap/scripts/gutsy
+
+RUN cd /tmp && git clone https://github.com/qubesos/qubes-infrastructure-mirrors && cd qubes-infrastructure-mirrors && python3 setup.py build install
 
 USER gitlab-runner
