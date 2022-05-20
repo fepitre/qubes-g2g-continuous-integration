@@ -1,7 +1,6 @@
 FROM fedora:latest
 LABEL maintainer="Frédéric Pierret <frederic.pierret@qubes-os.org>"
 
-RUN dnf -y update
 RUN dnf -y install git curl sudo passwd grub2-tools devscripts debootstrap \
   pbuilder git python3-sh wget createrepo rpm yum yum-utils mock rsync \
   rpmdevtools rpm-build perl-Digest-MD5 perl-Digest-SHA python3-pyyaml \
@@ -10,7 +9,7 @@ RUN dnf -y install git curl sudo passwd grub2-tools devscripts debootstrap \
   python3-pip python3-gobject e2fsprogs ca-certificates which \
   python3-requests-mock python3-pytest python3-pytest-mock python3-pytest-cov \
   python3-podman python3-yaml python3-click python3-docker podman docker gpg rpm-sign tree \
-  python3-pathspec python3-packaging
+  python3-pathspec python3-packaging python3-debian
 RUN dnf clean all
 
 RUN useradd -m -p "" gitlab-runner -s /bin/bash
