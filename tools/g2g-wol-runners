@@ -1,0 +1,21 @@
+#!/bin/bash
+
+set -e
+
+elementIn () {
+  local element
+  for element in "${@:2}"; do [[ "$element" == "$1" ]] && return 0; done
+  return 1
+}
+
+read -r -a CI_RUNNER_TAGS <<<"${CI_RUNNER_TAGS}"
+
+if elementIn qubes "${CI_RUNNER_TAGS[@]}"; then
+    echo "WOL fraise"
+    curl -s -i -X POST -H "x-access-tokens: $(cat /home/user/gitlab-ci-g2g/wol_token)" https://wol.notset.fr/api/machines/fraise > /dev/null
+fi
+
+if elementIn docker "${CI_RUNNER_TAGS[@]}" || elementIn vm "${CI_RUNNER_TAGS[@]}"; then
+    echo "WOL framboise"
+    curl -s -i -X POST -H "x-access-tokens: $(cat /home/user/gitlab-ci-g2g/wol_token)" https://wol.notset.fr/api/machines/framboise > /dev/null
+fi

@@ -38,9 +38,13 @@ import gitlab
 
 
 logger = logging.getLogger("G2G")
-console_handler = logging.StreamHandler(sys.stderr)
-logger.addHandler(console_handler)
 logger.setLevel(logging.DEBUG)
+
+fh = logging.FileHandler('/home/user/log/g2g.log')
+ch = logging.StreamHandler(sys.stderr)
+
+logger.addHandler(fh)
+logger.addHandler(ch)
 
 
 class GitException(Exception):
@@ -403,7 +407,7 @@ class G2G:
             raise G2GError("Unknown Qubes RPC: %s" % rpc)
 
         self.qubes_rpc = rpc
-        config_path = os.path.expanduser("~/.config/qubes/gitlabci")
+        config_path = os.environ.get("GITLABCI_CONFIG", os.path.expanduser("~/.config/qubes/gitlabci"))
         self.config.read(config_path)
 
     def read_input(self):

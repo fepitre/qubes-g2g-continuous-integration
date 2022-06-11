@@ -28,10 +28,16 @@ class Service:
     def __init__(self):
         pass
 
-    def qrexec(self, vm, service, input_data=None):
-        p = subprocess.Popen(['/usr/bin/qrexec-client-vm', vm, service],
-                             stdin=subprocess.PIPE,
-                             stdout=open(os.devnull, 'w'))
+    def run(self, vm, service, input_data=None):
+        if os.path.exists("/usr/bin/qrexec-client-vm"):
+            cmd = ['/usr/bin/qrexec-client-vm', vm, service]
+        else:
+            cmd = ["/usr/local/bin/gitlabci.G2G"]
+        p = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=open(os.devnull, 'w')
+        )
         p.communicate(input_data.encode())
 
     def handle(self, obj):
@@ -43,7 +49,7 @@ class Service:
                 pr_id = obj['pull_request']['number']
                 base_ref = obj['pull_request']['base']['ref']
                 # set target domain in qrexec policy
-                self.qrexec('dom0', 'gitlabci.G2G', '{}\n{}\n{}\n{}\n'.format(
+                self.run('dom0', 'gitlabci.G2G', '{}\n{}\n{}\n{}\n'.format(
                     'GithubPullRequest', repo_name, pr_id, base_ref))
             elif 'issue' in obj:
                 if obj['action'] != 'created':
@@ -54,7 +60,7 @@ class Service:
                 user = obj['comment']['user']['login']
                 comment_body = obj['comment']['body']
                 # set target domain in qrexec policy
-                self.qrexec('dom0', 'gitlabci.G2G', '{}\n{}\n{}\n{}\n'.format(
+                self.run('dom0', 'gitlabci.G2G', '{}\n{}\n{}\n{}\n'.format(
                     'GithubCommand', repo_url, user, comment_body))
             elif 'object_kind' in obj:
                 if obj['object_kind'] == 'pipeline':
@@ -64,7 +70,7 @@ class Service:
                     pipeline_status = obj['object_attributes']['status']
                     pipeline_sha = obj['object_attributes']['sha']
                     # set target domain in qrexec policy
-                    self.qrexec('dom0', 'gitlabci.G2G',
+                    self.run('dom0', 'gitlabci.G2G',
                                 '{}\n{}\n{}\n{}\n{}\n{}\n'.format(
                                     'GitlabPipelineStatus',
                                     repo_name,

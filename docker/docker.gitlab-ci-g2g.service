@@ -1,0 +1,19 @@
+[Unit]
+Description=Gitlab CI G2G
+After=docker.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+ExecStartPre=-/usr/bin/docker kill %n
+ExecStartPre=-/usr/bin/docker rm %n
+ExecStartPre=/usr/bin/docker build -f /opt/qubes-g2g-continuous-integration/docker/Dockerfile -t gitlab-ci-g2g /opt/qubes-g2g-continuous-integration
+ExecStart=/usr/bin/docker run --rm --name %n -p 8080:80 \
+            -v /etc/gitlab-ci-g2g:/home/user/gitlab-ci-g2g:ro \
+            -v /var/log/gitlab-ci-g2g:/home/user/gitlab-ci-g2g-logs \
+            -v /var/log/gitlab-ci-g2g/nginx:/var/log/nginx \
+            gitlab-ci-g2g
+ExecStop=/usr/bin/docker kill %n
+
+[Install]
+WantedBy=multi-user.target
