@@ -23,7 +23,7 @@ virt-install \
     --import \
     --vcpus=4 \
     --ram=8192 \
-    --network network=network-ci \
+    --network network=default \
     --graphics none \
     --noautoconsole
 
