@@ -6,10 +6,10 @@ check_interval = 0
 
 [[runners]]
   name = ...
-  output_limit = 131072
-  url = "https://gitlab.com"
   token = ...
+  url = "https://gitlab.com"
   executor = "custom"
+  output_limit = 131072
   builds_dir = "/home/gitlab-runner/builds"
   cache_dir = "/home/gitlab-runner/cache"
   [runners.custom_build_dir]

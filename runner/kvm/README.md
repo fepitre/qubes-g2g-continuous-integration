@@ -48,11 +48,51 @@ echo "options kvm ignore_msrs=1 report_ignored_msrs=0" > /etc/modprobe.d/kvm.con
 
 # gitlab-runner
 
+### Installation
+
 Install gitlab-runner (see [https://docs.gitlab.com/runner/install/linux-repository.html](https://docs.gitlab.com/runner/install/linux-repository.html)).
 
 Don't forget to add Gitlab CA before the runner registration.
 
 Add `gitlab-runner` to `libvirt` and `kvm` groups.
+
+### Configuration
+
+Clone current project repository to `/opt`. Ensure that `root` has SSH keys generated (`/root/.ssh/id_rsa.pub` will be injected inside the ephemeral VM to allow root send command through SSH).
+Generate the VM that will be used as template for runner jobs with the script `generate-fedora.sh`. It will create the `qcow2` image at `/var/lib/libvirt/images/gitlab-runner-fedora.qcow2`.
+Ensure that permission makes `libvirt` accessing the image like `666`.
+
+Register current machine as `custom` runner to your Gitlab instance and once this is done, edit the file `/etc/gitlab-runner/config.toml` and add the corresponding fields like:
+```toml
+concurrent = 4
+check_interval = 0
+
+[session_server]
+  session_timeout = 1800
+
+[[runners]]
+  name = "myAwesomeRunner"
+  token = "thisisNOTtheREGISTRATIONtoken"
+  url = "https://gitlab.com"
+  executor = "custom"
+  output_limit = 131072
+  builds_dir = "/home/gitlab-runner/builds"
+  cache_dir = "/home/gitlab-runner/cache"
+  [runners.custom_build_dir]
+  [runners.cache]
+    [runners.cache.s3]
+    [runners.cache.gcs]
+  [runners.custom]
+    prepare_exec = "/opt/qubes-g2g-continuous-integration/runner/kvm/prepare.sh"
+    run_exec = "/opt/qubes-g2g-continuous-integration/runner/kvm/run.sh"
+    cleanup_exec = "/opt/qubes-g2g-continuous-integration/runner/kvm/cleanup.sh"
+```
+
+Ensure that `default` network is started and marked as autostart:
+```bash
+$ sudo virsh net-start default
+$ sudo virsh net-autostart default
+```
 
 # bridge
 
