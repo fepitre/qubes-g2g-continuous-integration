@@ -36,7 +36,7 @@ class Service:
         p = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,
-            stdout=open(os.devnull, 'w')
+            stdout=subprocess.DEVNULL,
         )
         p.communicate(input_data.encode())
 
