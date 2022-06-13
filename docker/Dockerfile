@@ -4,7 +4,7 @@ MAINTAINER Frédéric Pierret <frederic@invisiblethingslab.com>
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get -qy update \
     && apt-get install -y sudo git nginx python3-flask python3-jwt python3-github python3-gitlab \
-        python3-dateutil uwsgi uwsgi-plugin-python3 nginx-full \
+        python3-dateutil uwsgi uwsgi-plugin-python3 nginx-full curl \
     && apt-get autoremove -y \
     && rm -rf /var/lib/lists/* \
     && apt-get clean autoclean
