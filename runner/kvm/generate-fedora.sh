@@ -16,7 +16,7 @@ virt-builder fedora-35 \
     --run-command "chmod +x /usr/local/bin/gitlab-runner" \
     --run-command 'useradd -m -u 11000 -p "" gitlab-runner -s /bin/bash' \
     --run-command "git lfs install --skip-repo" \
-    --ssh-inject gitlab-runner:file:/root/.ssh/id_rsa.pub \
+    --ssh-inject gitlab-runner:file:/root/.ssh/id_rsa_gitlab.pub \
     --run-command "rm -f /root/.ssh/know_hosts" \
     --run-command "echo 'gitlab-runner ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers" \
     --run-command "sed -E 's/GRUB_CMDLINE_LINUX=\"\"/GRUB_CMDLINE_LINUX=\"net.ifnames=0 biosdevname=0\"/' -i /etc/default/grub" \

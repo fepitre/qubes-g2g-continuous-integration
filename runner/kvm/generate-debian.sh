@@ -17,7 +17,7 @@ virt-builder debian-10 \
     --run-command 'useradd -m -u 11000 -p "" gitlab-runner -s /bin/bash' \
     --install gitlab-runner,git,git-lfs,openssh-server \
     --run-command "git lfs install --skip-repo" \
-    --ssh-inject gitlab-runner:file:/root/.ssh/id_rsa.pub \
+    --ssh-inject gitlab-runner:file:/root/.ssh/id_rsa_gitlab.pub \
     --run-command "rm -f /root/.ssh/know_hosts" \
     --upload /home/user/ci-keys/id_rsa:/home/gitlab-runner/.ssh/id_rsa \
     --run-command "chown gitlab-runner:gitlab-runner /home/gitlab-runner/.ssh/id_rsa" \
