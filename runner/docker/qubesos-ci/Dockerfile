@@ -12,7 +12,7 @@ RUN dnf -y install git curl sudo passwd grub2-tools devscripts debootstrap \
   python3-pathspec python3-packaging python3-debian python3-lxml
 RUN dnf clean all
 
-RUN useradd -m -p "" gitlab-runner -s /bin/bash
+RUN useradd -m -u 11000 -p "" gitlab-runner -s /bin/bash
 RUN echo 'gitlab-runner ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 
 # debootstrap: workaround until upstream merge it

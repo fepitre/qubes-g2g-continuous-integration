@@ -14,7 +14,7 @@ virt-builder debian-10 \
     --run-command "grub-install /dev/sda" \
     --run-command "curl -L https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh | bash" \
     --run-command "curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | bash" \
-    --run-command 'useradd -m -p "" gitlab-runner -s /bin/bash' \
+    --run-command 'useradd -m -u 11000 -p "" gitlab-runner -s /bin/bash' \
     --install gitlab-runner,git,git-lfs,openssh-server \
     --run-command "git lfs install --skip-repo" \
     --ssh-inject gitlab-runner:file:/root/.ssh/id_rsa.pub \

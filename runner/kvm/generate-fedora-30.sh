@@ -13,7 +13,7 @@ virt-builder fedora-30 \
     --run-command "rm -rf /etc/yum.repos.d/*modular*.repo /etc/yum.repos.d/fedora-cisco-openh264.repo; " \
     --install curl,sudo,passwd,grub2-tools \
     --run-command "curl -L https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.rpm.sh | bash" \
-    --run-command 'useradd -m -p "" gitlab-runner -s /bin/bash' \
+    --run-command 'useradd -m -u 11000 -p "" gitlab-runner -s /bin/bash' \
     --install gitlab-runner,git,git-lfs,openssh-server \
     --run-command "git lfs install --skip-repo" \
     --ssh-inject gitlab-runner:file:/root/.ssh/id_rsa.pub \
