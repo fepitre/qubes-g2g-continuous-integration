@@ -48,8 +48,10 @@ for i in $(seq 1 120); do
 done
 
 # Cleanup known_hosts
-rm -f "/root/.ssh/known_hosts.old"
-ssh-keygen -f "/root/.ssh/known_hosts" -R "$VM_IP"
+rm -f "$HOME/.ssh/known_hosts.old"
+if [ -e $HOME/.ssh/known_hosts ]; then
+    ssh-keygen -f "$HOME/.ssh/known_hosts" -R "$VM_IP"
+fi
 
 # Wait for ssh to become available
 echo "Waiting for sshd to be available"
