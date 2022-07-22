@@ -530,7 +530,7 @@ class G2G:
                 raise G2GError("User not whitelisted")
 
         if untrusted_data.get("comment_body", None):
-            known_commands = ["PipelineRefresh", "PipelineRetry"]
+            known_commands = ["PipelineRefresh", "PipelineRetry", "PipelineRetryFailed"]
             untrusted_data["comment_body"] = untrusted_data["comment_body"] + "+"
             unstrusted_parsed_command_args = untrusted_data["comment_body"].split(
                 "+", 1
@@ -699,6 +699,7 @@ def process_pipeline(
     pull_request=None,
     branch=None,
     sha=None,
+    retry_failed=False,
     **kwargs,
 ):
     logger.info("Process Pipeline")
@@ -774,6 +775,12 @@ def process_pipeline(
 
     gitlab_component_url = f"https://gitlab.com/{gitlab_owner}/{gitlab_component}"
     pipeline_url = get_url(gitlab_component_url, pipeline_id)
+
+    if retry_failed:
+        try:
+            pipeline.retry()
+        except GitlabCliError as e:
+            raise InternalError("Failed to retry pipeline") from e
 
     # Send status to Github
     try:
@@ -896,6 +903,10 @@ def main():
             args = data["github_command_args"]
             if cmd == "PipelineRefresh":
                 process_pipeline_args["pull_request"] = str(data.get("pr_number", 0))
+                process_pipeline(**process_pipeline_args)
+            elif cmd == "PipelineRetryFailed":
+                process_pipeline_args["pull_request"] = str(data.get("pr_number", 0))
+                process_pipeline_args["retry_failed"] = True
                 process_pipeline(**process_pipeline_args)
             elif cmd == "PipelineRetry":
                 if args == "head":
