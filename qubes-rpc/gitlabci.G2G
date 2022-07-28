@@ -80,7 +80,7 @@ class GitCli:
                 shell=True,
                 cwd=cwd,
                 check=True,
-                capture_output=True,
+                capture_output=True
             )
             return result.stdout
         except subprocess.CalledProcessError as e:
@@ -676,11 +676,13 @@ def create_gitlab_branch(
 
     # Before pushing new branch we cancel previous running pipelines
     # with same pr branch name
-    logger.debug(f"Push to {gitlab_owner}")
     gitlab_cli.cancel_pipelines(gitlab_owner, gitlab_component, gitlab_branch)
+
+    logger.debug(f"Push to {gitlab_owner}/{gitlab_component}:{gitlab_branch}")
     git_cli.push(gitlab_owner, gitlab_branch, force=True)
 
     # Trigger callback scripts
+    logger.debug("Trigger callback scripts")
     g2g_cli.callback()
 
 
