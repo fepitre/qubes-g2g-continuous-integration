@@ -648,6 +648,8 @@ def create_gitlab_branch(
             logger.debug(f"Checkout {base_ref} (base reference)")
             git_cli.checkout(base_sha, branch=gitlab_branch)
             git_cli.reset(base_sha, hard=True)
+
+            logging.debug(f"Merge {head_sha} into {base_sha}")
             git_cli.merge(head_sha, message=f"Merge {head_sha} into {base_sha}")
         except Exception as e:
             if base_sha:
@@ -911,7 +913,7 @@ def main():
                 process_pipeline(**process_pipeline_args)
             elif cmd == "PipelineRetry":
                 if args == "head":
-                    create_gitlab_branch_args["no-merge"] = True
+                    create_gitlab_branch_args["no_merge"] = True
                 create_gitlab_branch(**create_gitlab_branch_args)
         elif qubes_rpc == "GithubPullRequest":
             logger.info(f"{data['github_repo_name']}: PR {data['pr_number']}")
