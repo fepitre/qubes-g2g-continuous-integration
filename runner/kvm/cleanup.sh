@@ -10,12 +10,12 @@ source ${currentDir}/base.sh # Get variables from base script.
 set -eo pipefail
 
 # Destroy VM.
-virsh shutdown "$VM_ID"
+virsh destroy "$VM_ID"
 
 if [ "${CUSTOM_ENV_NO_CLEANUP}" != 1 ]; then
     # Undefine VM.
     virsh undefine "$VM_ID"
-    
+
     # Delete VM disk.
     if [ -f "$VM_IMAGE" ]; then
         rm "$VM_IMAGE"
