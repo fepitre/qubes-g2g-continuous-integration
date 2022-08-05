@@ -2,16 +2,14 @@
 
 # Based on https://docs.gitlab.com/runner/executors/custom_examples/libvirt.html
 
-# /opt/libivrt-driver/base.sh
+# /opt/libvirt-driver/base.sh
 
 VM_IMAGES_PATH="/var/lib/libvirt/images"
 
 BASE_VM_IMAGE="$VM_IMAGES_PATH/gitlab-runner-fedora.qcow2"
 if [ "${CUSTOM_ENV_USE_CENTOS_IMAGE}" = 1 ]; then
-# script to be created
 BASE_VM_IMAGE="$VM_IMAGES_PATH/gitlab-runner-centos.qcow2"
 elif [ "${CUSTOM_ENV_USE_UBUNTU_IMAGE}" = 1 ]; then
-# script to be created
 BASE_VM_IMAGE="$VM_IMAGES_PATH/gitlab-runner-ubuntu.qcow2"
 elif [ "${CUSTOM_ENV_USE_DEBIAN_IMAGE}" = 1 ]; then
 BASE_VM_IMAGE="$VM_IMAGES_PATH/gitlab-runner-debian.qcow2"
