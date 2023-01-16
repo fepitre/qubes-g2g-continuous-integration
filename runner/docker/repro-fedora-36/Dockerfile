@@ -1,4 +1,4 @@
-FROM fedora:34
+FROM fedora:36
 
 RUN dnf install -y dnf-plugins-core
 RUN dnf install -y reprotest

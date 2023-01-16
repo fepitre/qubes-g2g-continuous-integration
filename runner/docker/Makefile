@@ -6,8 +6,8 @@ DOCKER_IMAGES ?= \
 	repro-bullseye \
 	repro-buster \
 	repro-dom0 \
-	repro-fedora-34 \
-	repro-fedora-35
+	repro-fedora-36 \
+	repro-fedora-37
 
 .ONESHELL:
 build: $(DOCKER_IMAGES:%=build-%)

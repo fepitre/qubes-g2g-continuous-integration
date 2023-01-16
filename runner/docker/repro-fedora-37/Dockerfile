@@ -1,4 +1,4 @@
-FROM fedora:35
+FROM fedora:37
 
 RUN dnf install -y dnf-plugins-core
 RUN dnf remove -y vim-minimal

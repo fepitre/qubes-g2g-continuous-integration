@@ -2,7 +2,7 @@
 
 set -x
 
-virt-builder fedora-35 \
+virt-builder fedora-37 \
     --smp 4 \
     --memsize 4096 \
     --size 50G \
