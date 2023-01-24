@@ -29,4 +29,5 @@ virt-builder fedora-37 \
     --run-command "usermod -aG docker gitlab-runner" \
     --run-command "systemctl enable docker" \
     --run-command "cd /tmp && git clone https://github.com/qubesos/qubes-infrastructure-mirrors && cd qubes-infrastructure-mirrors && python3 setup.py build install" \
+    --run-command "sed -i -e 's/^##\(activate = 1\|.*default_sect\|.*legacy_sect\)/\1/' /etc/pki/tls/openssl.cnf" \
     --root-password password:root

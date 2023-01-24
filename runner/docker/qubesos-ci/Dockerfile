@@ -21,4 +21,6 @@ RUN sed -i 's@if \! doing_variant fakechroot\; then@if \! doing_variant fakechro
 
 RUN cd /tmp && git clone https://github.com/qubesos/qubes-infrastructure-mirrors && cd qubes-infrastructure-mirrors && python3 setup.py build install
 
+RUN sed -i -e 's/^##\(activate = 1\|.*default_sect\|.*legacy_sect\)/\1/' /etc/pki/tls/openssl.cnf
+
 USER gitlab-runner
