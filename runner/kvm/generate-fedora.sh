@@ -14,7 +14,7 @@ virt-builder fedora-37 \
     --copy-in "gitlab_runner.repo:/etc/yum.repos.d/" \
     --copy-in "packages-gitlab-gpg-key.pub.gpg:/etc/pki/rpm-gpg/" \
     --copy-in "runner-gitlab-runner-4C80FB51394521E9.pub.gpg:/etc/pki/rpm-gpg/" \
-    --install gitlab-runner,git,git-lfs,openssh-server,curl,sudo,passwd,grub2-tools,devscripts,debootstrap,pbuilder,python3-sh,wget,createrepo,rpm,yum,yum-utils,mock,rsync,rpmdevtools,rpm-build,perl-Digest-MD5,perl-Digest-SHA,python3-pyyaml,hunspell,pandoc,jq,rubygems,ruby-devel,gcc-c++,pkg-config,libxml2,libxslt,libxslt-devel,rubygem-bundler,python3-pip,cryptsetup,python3-packaging,createrepo_c,devscripts,gpg,python3-pyyaml,docker,python3-docker,podman,python3-podman,reprepro,docker-compose,rpm-sign,xterm-resize,vim,python3-pathspec,python3-lxml,kernel-devel,tree \
+    --install gitlab-runner,git,git-lfs,openssh-server,curl,sudo,passwd,grub2-tools,devscripts,debootstrap,pbuilder,python3-sh,wget,createrepo,rpm,yum,yum-utils,mock,rsync,rpmdevtools,rpm-build,perl-Digest-MD5,perl-Digest-SHA,python3-pyyaml,hunspell,pandoc,jq,rubygems,ruby-devel,gcc-c++,pkg-config,libxml2,libxslt,libxslt-devel,rubygem-bundler,python3-pip,cryptsetup,python3-packaging,createrepo_c,devscripts,gpg,python3-pyyaml,docker,python3-docker,podman,python3-podman,reprepro,docker-compose,rpm-sign,xterm-resize,vim,python3-pathspec,python3-lxml,kernel-devel,tree,python3-jinja2-cli,pacman,m4,asciidoc,rsync \
     --run-command "dnf update -y kernel kernel-devel" \
     --run-command "git lfs install --skip-repo" \
     --ssh-inject gitlab-runner:file:/root/.ssh/id_rsa_gitlab.pub \
