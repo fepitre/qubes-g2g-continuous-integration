@@ -5,7 +5,7 @@ set -x
 virt-builder fedora-37 \
     --smp 4 \
     --memsize 4096 \
-    --size 50G \
+    --size 80G \
     --output /var/lib/libvirt/images/gitlab-runner-fedora.qcow2 \
     --format qcow2 \
     --hostname gitlab-runner-fedora \
