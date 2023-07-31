@@ -38,6 +38,7 @@ RUN dnf -y install \
     python3-pathspec \
     python3-pip \
     python3-podman \
+    python3-psutil \
     python3-pytest \
     python3-pytest-cov \
     python3-pytest-mock \
