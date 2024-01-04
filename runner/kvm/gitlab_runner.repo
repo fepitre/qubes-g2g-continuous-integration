@@ -6,6 +6,7 @@ gpgcheck=1
 enabled=1
 gpgkey=file:///etc/pki/rpm-gpg/packages-gitlab-gpg-key.pub.gpg
        file:///etc/pki/rpm-gpg/runner-gitlab-runner-4C80FB51394521E9.pub.gpg
+       file:///etc/pki/rpm-gpg/runner-gitlab-runner-49F16C5CC3A0F81F.pub.gpg
 sslverify=1
 sslcacert=/etc/pki/tls/certs/ca-bundle.crt
 metadata_expire=300
@@ -18,6 +19,7 @@ gpgcheck=1
 enabled=0
 gpgkey=file:///etc/pki/rpm-gpg/packages-gitlab-gpg-key.pub.gpg
        file:///etc/pki/rpm-gpg/runner-gitlab-runner-4C80FB51394521E9.pub.gpg
+       file:///etc/pki/rpm-gpg/runner-gitlab-runner-49F16C5CC3A0F81F.pub.gpg
 sslverify=1
 sslcacert=/etc/pki/tls/certs/ca-bundle.crt
 metadata_expire=300
