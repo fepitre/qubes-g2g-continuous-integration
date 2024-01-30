@@ -1,6 +1,6 @@
 [runner_gitlab-runner]
 name=runner_gitlab-runner
-baseurl=https://packages.gitlab.com/runner/gitlab-runner/fedora/$releasever/$basearch
+baseurl=https://packages.gitlab.com/runner/gitlab-runner/fedora/38/$basearch
 repo_gpgcheck=1
 gpgcheck=1
 enabled=1
@@ -12,7 +12,7 @@ metadata_expire=300
 
 [runner_gitlab-runner-source]
 name=runner_gitlab-runner-source
-baseurl=https://packages.gitlab.com/runner/gitlab-runner/fedora/$releasever/SRPMS
+baseurl=https://packages.gitlab.com/runner/gitlab-runner/fedora/38/SRPMS
 repo_gpgcheck=1
 gpgcheck=1
 enabled=0
