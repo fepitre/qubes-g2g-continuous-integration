@@ -1,0 +1,18 @@
+# dispvm for jobs
+admin.vm.Create.DispVM      +gitlab-ci-dvm          gitlab-ci-admin                     dom0                            allow
+admin.vm.Start              *                       gitlab-ci-admin                     @tag:created-by-gitlab-ci-admin allow   target=dom0
+admin.vm.Kill               *                       gitlab-ci-admin                     @tag:created-by-gitlab-ci-admin allow   target=dom0
+admin.vm.Remove             *                       gitlab-ci-admin                     @tag:created-by-gitlab-ci-admin allow   target=dom0
+admin.vm.property.Set       +auto_cleanup           gitlab-ci-admin                     @tag:created-by-gitlab-ci-admin allow   target=dom0
+qubes.VMShell               *                       gitlab-ci-admin                     @tag:created-by-gitlab-ci-admin allow   user=root
+
+# dispvm for QubesExecutor
+admin.vm.CreateDisposable   *                       @tag:created-by-gitlab-ci-admin     builder-dvm                     allow   target=dom0
+admin.vm.Start              *                       @tag:created-by-gitlab-ci-admin     @tag:disp-for-executor          allow   target=dom0
+admin.vm.Kill               *                       @tag:created-by-gitlab-ci-admin     @tag:disp-for-executor          allow   target=dom0
+qubes.Filecopy              *                       @tag:created-by-gitlab-ci-admin     @tag:disp-for-executor          allow
+qubes.Filecopy              *                       @tag:created-by-gitlab-ci-admin     @tag:disp-for-executor          allow
+qubesbuilder.FileCopyIn     *                       @tag:created-by-gitlab-ci-admin     @tag:disp-for-executor          allow
+qubesbuilder.FileCopyOut    *                       @tag:created-by-gitlab-ci-admin     @tag:disp-for-executor          allow
+qubes.WaitForSession        *                       @tag:created-by-gitlab-ci-admin     @tag:disp-for-executor          allow
+qubes.VMShell               *                       @tag:created-by-gitlab-ci-admin     @tag:disp-for-executor          allow
