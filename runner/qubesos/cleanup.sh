@@ -8,5 +8,4 @@ set -eo pipefail
 # check dispvm name
 check_dispvm_name
 
-# kill dispvm
-qrexec-client-vm -- "$DISPVM_NAME" admin.vm.Kill < /dev/null
+cleanup

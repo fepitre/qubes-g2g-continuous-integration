@@ -5,8 +5,9 @@ source "${currentDir}"/base.sh
 
 set -eo pipefail
 
-trap "exit $SYSTEM_FAILURE_EXIT_CODE" ERR
+trap 'cleanup' TERM ERR
 
+# check dispvm name
 check_dispvm_name
 
 # create dispvm
