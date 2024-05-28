@@ -4,7 +4,7 @@ admin.vm.Start              *                       gitlab-ci-admin             
 admin.vm.Kill               *                       gitlab-ci-admin                     @tag:created-by-gitlab-ci-admin allow   target=dom0
 admin.vm.Remove             *                       gitlab-ci-admin                     @tag:created-by-gitlab-ci-admin allow   target=dom0
 admin.vm.property.Set       +auto_cleanup           gitlab-ci-admin                     @tag:created-by-gitlab-ci-admin allow   target=dom0
-qubes.VMShell               *                       gitlab-ci-admin                     @tag:created-by-gitlab-ci-admin allow   user=root
+qubes.VMShell               *                       gitlab-ci-admin                     @tag:created-by-gitlab-ci-admin allow
 
 # dispvm for QubesExecutor
 admin.vm.CreateDisposable   *                       @tag:created-by-gitlab-ci-admin     builder-dvm                     allow   target=dom0

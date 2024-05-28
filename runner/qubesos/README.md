@@ -48,8 +48,8 @@ check_interval = 0
   url = "https://gitlab.com"
   executor = "custom"
   output_limit = 131072
-  builds_dir = "/home/gitlab-runner/builds"
-  cache_dir = "/home/gitlab-runner/cache"
+  builds_dir = "/home/user/builds"
+  cache_dir = "/home/user/cache"
   [runners.custom_build_dir]
   [runners.cache]
     [runners.cache.s3]
