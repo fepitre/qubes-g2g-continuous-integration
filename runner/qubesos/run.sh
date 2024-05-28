@@ -3,7 +3,7 @@
 currentDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 source "${currentDir}"/base.sh
 
-trap 'cleanup' TERM ERR
+trap 'cleanup' TERM
 
 # check dispvm name
 check_dispvm_name
