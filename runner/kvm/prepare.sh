@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # Based on https://docs.gitlab.com/runner/executors/custom_examples/libvirt.html
 
@@ -10,7 +10,7 @@ source "${currentDir}"/base.sh # Get variables from base script.
 set -eo pipefail
 
 # trap any error, and mark it as a system failure.
-trap "exit $SYSTEM_FAILURE_EXIT_CODE" ERR
+trap 'cleanup' TERM ERR
 
 # Copy base disk to use for Job.
 qemu-img create -f qcow2 -F qcow2 -b "$BASE_VM_IMAGE" "$VM_IMAGE"
@@ -18,11 +18,11 @@ qemu-img create -f qcow2 -F qcow2 -b "$BASE_VM_IMAGE" "$VM_IMAGE"
 # Install the VM
 virt-install \
     --name "$VM_ID" \
-    --os-variant debian10 \
+    --os-variant "${CUSTOM_ENV_VM_OS_VARIANT:-fedora38}" \
     --disk "$VM_IMAGE" \
     --import \
-    --vcpus=4 \
-    --ram=8192 \
+    --vcpus="${CUSTOM_ENV_VM_VCPUS:-4}" \
+    --ram="${CUSTOM_ENV_VM_MEMORY:-8192}" \
     --network network=default \
     --graphics none \
     --noautoconsole
@@ -49,14 +49,14 @@ done
 
 # Cleanup known_hosts
 rm -f "$HOME/.ssh/known_hosts.old"
-if [ -e $HOME/.ssh/known_hosts ]; then
+if [ -e "$HOME/.ssh/known_hosts" ]; then
     ssh-keygen -f "$HOME/.ssh/known_hosts" -R "$VM_IP"
 fi
 
 # Wait for ssh to become available
-echo "Waiting for sshd to be available"
+echo "Waiting for sshd to be available at $VM_IP"
 for i in $(seq 1 60); do
-    if ssh -i /root/.ssh/id_rsa_gitlab -o StrictHostKeyChecking=no gitlab-runner@"$VM_IP" >/dev/null 2>/dev/null; then
+    if ssh $VM_SSH_ARGS gitlab-runner@"$VM_IP" >/dev/null 2>/dev/null; then
         break
     fi
 
