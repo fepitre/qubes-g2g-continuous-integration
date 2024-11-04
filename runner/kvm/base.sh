@@ -12,9 +12,18 @@ else
     BASE_VM_IMAGE="$VM_IMAGES_PATH/gitlab-runner-fedora.qcow2"
 fi
 
+if [ -e /home/gitlab-runner/.ssh/id_rsa ]; then
+  SSH_KEY=/home/gitlab-runner/.ssh/id_rsa
+elif [ -e /var/lib/gitlab-runner/.ssh/id_rsa ]; then
+  SSH_KEY=/var/lib/gitlab-runner/.ssh/id_rsa
+else
+  echo "Cannot find gitlab-runner's SSH public key."
+  exit 1
+fi
+
 VM_ID="runner-$CUSTOM_ENV_CI_RUNNER_ID-project-$CUSTOM_ENV_CI_PROJECT_ID-concurrent-$CUSTOM_ENV_CI_CONCURRENT_PROJECT_ID-job-$CUSTOM_ENV_CI_JOB_ID"
 VM_IMAGE="$VM_IMAGES_PATH/$VM_ID.qcow2"
-VM_SSH_ARGS="-i /home/gitlab-runner/.ssh/id_rsa -o StrictHostKeyChecking=no ${CUSTOM_ENV_VM_SSH_EXTRA_ARGS:-}"
+VM_SSH_ARGS="-i $SSH_KEY -o StrictHostKeyChecking=no ${CUSTOM_ENV_VM_SSH_EXTRA_ARGS:-}"
 
 _get_vm_ip() {
     virsh -q domifaddr "$VM_ID" | awk '{print $4}' | sed -E 's|/([0-9]+)?$||'
