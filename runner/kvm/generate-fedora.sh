@@ -2,7 +2,7 @@
 
 set -x
 
-virt-builder fedora-38 \
+virt-builder fedora-40 \
     --smp 4 \
     --memsize 4096 \
     --size 80G \
