@@ -2,15 +2,18 @@
 
 set -x
 
+LOCAL_DIR="$(dirname "$0")"
+
 if [ -e /home/gitlab-runner/.ssh/id_rsa.pub ]; then
   SSH_PUB_KEY=/home/gitlab-runner/.ssh/id_rsa.pub
 elif [ -e /var/lib/gitlab-runner/.ssh/id_rsa.pub ]; then
   SSH_PUB_KEY=/var/lib/gitlab-runner/.ssh/id_rsa.pub
+elif [ -e "$LOCAL_DIR"/id_rsa.pub ]; then
+  SSH_PUB_KEY="$LOCAL_DIR"/id_rsa.pub
 else
   echo "Cannot find gitlab-runner's SSH public key."
   exit 1
 fi
-
 
 virt-builder fedora-40 \
     --smp 4 \
