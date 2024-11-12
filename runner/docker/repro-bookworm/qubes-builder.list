@@ -1,3 +1,0 @@
-deb [trusted=yes] file:/tmp/qubes-deb bookworm main
-deb [arch=amd64] https://deb.qubes-os.org/r4.1/vm bookworm main
-deb [arch=amd64] https://deb.qubes-os.org/r4.1/vm bookworm-testing main

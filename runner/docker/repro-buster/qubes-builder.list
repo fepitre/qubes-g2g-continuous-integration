@@ -1,3 +1,0 @@
-deb [trusted=yes] file:/tmp/qubes-deb buster main
-deb [arch=amd64] https://deb.qubes-os.org/r4.1/vm buster main
-deb [arch=amd64] https://deb.qubes-os.org/r4.1/vm buster-testing main
