@@ -60,6 +60,7 @@ RUN dnf -y install \
     tree \
     wget \
     which \
+    xorg-x11-server-Xvfb \
     yum \
     yum-utils
 
