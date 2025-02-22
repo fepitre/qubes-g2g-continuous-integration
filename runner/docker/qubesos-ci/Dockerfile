@@ -72,6 +72,39 @@ RUN echo 'gitlab-runner ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 # https://salsa.debian.org/installer-team/debootstrap/-/merge_requests/26/
 RUN sed -i 's@if \! doing_variant fakechroot\; then@if \! doing_variant fakechroot \&\& [ \"$CONTAINER\" \!= docker ]\; then@g' /usr/share/debootstrap/scripts/debian-common /usr/share/debootstrap/scripts/gutsy
 
+RUN wget -O /etc/pki/rpm-gpg/RPM-GPG-KEY-qubes-4.2-primary https://raw.githubusercontent.com/QubesOS/qubes-builderv2/main/qubesbuilder/plugins/chroot_rpm/keys/RPM-GPG-KEY-qubes-4.2-primary
+RUN wget -O /etc/pki/rpm-gpg/RPM-GPG-KEY-qubes-4.3-primary https://raw.githubusercontent.com/QubesOS/qubes-builderv2/main/qubesbuilder/plugins/chroot_rpm/keys/RPM-GPG-KEY-qubes-4.3-primary
+RUN printf '\
+[qubes-host-r4.2-current]\n\
+name=qubes-host-r4.2-current\n\
+baseurl=https://yum.qubes-os.org/r4.2/current/host/fc37\n\
+enabled=0\n\
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-qubes-4.2-primary\n\
+gpgcheck=1\n\
+repo_gpgcheck = 1\n\
+[qubes-host-r4.2-current-testing]\n\
+name=qubes-host-r4.2-testing\n\
+baseurl=https://yum.qubes-os.org/r4.2/current-testing/host/fc37\n\
+enabled=0\n\
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-qubes-4.2-primary\n\
+gpgcheck=1\n\
+repo_gpgcheck = 1\n\
+[qubes-host-r4.3-current]\n\
+name=qubes-host-r4.3-current\n\
+baseurl=https://yum.qubes-os.org/r4.3/current/host/fc41\n\
+enabled=0\n\
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-qubes-4.3-primary\n\
+gpgcheck=1\n\
+repo_gpgcheck = 1\n\
+[qubes-host-r4.3-current-testing]\n\
+name=qubes-host-r4.3-testing\n\
+baseurl=https://yum.qubes-os.org/r4.3/current-testing/host/fc41\n\
+enabled=0\n\
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-qubes-4.3-primary\n\
+gpgcheck=1\n\
+repo_gpgcheck = 1\n\
+'\ >> /etc/yum.repos.d/qubes.repo
+
 RUN cd /tmp && git clone https://github.com/qubesos/qubes-infrastructure-mirrors && cd qubes-infrastructure-mirrors && python3 setup.py build install
 
 RUN sed -i -e 's/^##\(activate = 1\|.*default_sect\|.*legacy_sect\)/\1/' /etc/pki/tls/openssl.cnf
