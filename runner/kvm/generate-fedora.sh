@@ -3,16 +3,19 @@
 set -eux
 
 LOCAL_DIR="$(dirname "$0")"
+SSH_PUB_KEY="${1:-}"
 
-if [ -e /home/gitlab-runner/.ssh/id_rsa.pub ]; then
-  SSH_PUB_KEY=/home/gitlab-runner/.ssh/id_rsa.pub
-elif [ -e /var/lib/gitlab-runner/.ssh/id_rsa.pub ]; then
-  SSH_PUB_KEY=/var/lib/gitlab-runner/.ssh/id_rsa.pub
-elif [ -e "$LOCAL_DIR"/id_rsa.pub ]; then
-  SSH_PUB_KEY="$LOCAL_DIR"/id_rsa.pub
-else
-  echo "Cannot find gitlab-runner's SSH public key."
-  exit 1
+if [ -z "${SSH_PUB_KEY}" ] || [ ! -e "${SSH_PUB_KEY}"]; then
+  if [ -e /home/gitlab-runner/.ssh/id_rsa.pub ]; then
+    SSH_PUB_KEY=/home/gitlab-runner/.ssh/id_rsa.pub
+  elif [ -e /var/lib/gitlab-runner/.ssh/id_rsa.pub ]; then
+    SSH_PUB_KEY=/var/lib/gitlab-runner/.ssh/id_rsa.pub
+  elif [ -e "$LOCAL_DIR"/id_rsa.pub ]; then
+    SSH_PUB_KEY="$LOCAL_DIR"/id_rsa.pub
+  else
+    echo "Cannot find gitlab-runner's SSH public key."
+    exit 1
+  fi
 fi
 
 PACKAGES="$(tr '\n' ',' < "${LOCAL_DIR}/packages_fedora.list")"
