@@ -23,7 +23,7 @@ virt-install \
     --import \
     --vcpus="${CUSTOM_ENV_VM_VCPUS:-4}" \
     --ram="${CUSTOM_ENV_VM_MEMORY:-8192}" \
-    --network network=default \
+    --network network=default,model=e1000e \
     --graphics none \
     --noautoconsole
 
