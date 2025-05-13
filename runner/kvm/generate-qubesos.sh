@@ -33,7 +33,7 @@ if [ -z "${GITLAB_RUNNER}" ]; then
 fi
 
 virt-customize -a /var/lib/libvirt/images/qubes_4.3_64bit_stable.qcow2 \
-  --run-command "sed -i 's;id=\"00_03.0\";id=\"00_01.0-00_00.0\";' /var/lib/qubes/qubes.xml" \
+  --run-command "sed -i.bak -e '0,/id=\"00_05\.0\"/{ /id=\"00_05\.0\"/{N;N;d;} }' -e 's|id=\"00_03.0.*::p020000\"|id=\"00_01.0-00_00.0\"|' /var/lib/qubes/qubes.xml" \
   --run-command "useradd -m -u 11000 gitlab-runner" \
   --ssh-inject gitlab-runner:file:"$SSH_PUB_KEY" \
   --run-command "echo 'gitlab-runner ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers" \
