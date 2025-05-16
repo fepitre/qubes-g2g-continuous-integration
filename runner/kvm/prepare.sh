@@ -16,16 +16,29 @@ trap 'cleanup' TERM ERR
 qemu-img create -f qcow2 -F qcow2 -b "$BASE_VM_IMAGE" "$VM_IMAGE"
 
 # Install the VM
+# detect if this is a Qubes image
+if [[ "$CUSTOM_ENV_VM_IMAGE" =~ ^qubes ]]; then
+  EXTRA_OPTS=(
+    --features ioapic.driver=qemu
+    --iommu model=intel,driver.intremap="on"
+  )
+else
+  EXTRA_OPTS=()
+fi
+
+echo "Extra options: ${EXTRA_OPTS[@]}"
+
 virt-install \
     --name "$VM_ID" \
     --os-variant "${CUSTOM_ENV_VM_OS_VARIANT:-fedora41}" \
-    --disk "$VM_IMAGE" \
+    --disk       "$VM_IMAGE" \
     --import \
-    --vcpus="${CUSTOM_ENV_VM_VCPUS:-4}" \
-    --ram="${CUSTOM_ENV_VM_MEMORY:-8192}" \
-    --network network=default,model=e1000e \
-    --graphics none \
-    --noautoconsole
+    --vcpus      "${CUSTOM_ENV_VM_VCPUS:-4}" \
+    --ram        "${CUSTOM_ENV_VM_MEMORY:-8192}" \
+    --network    network=default,model=e1000e \
+    --graphics   none \
+    --noautoconsole \
+    "${EXTRA_OPTS[@]}"
 
 # Wait for VM to get IP
 echo 'Waiting for VM to get IP'
