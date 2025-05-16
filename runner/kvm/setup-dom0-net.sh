@@ -2,6 +2,11 @@
 
 set -x
 set -e
+
+while ! qvm-start sys-net; do
+  sleep 1
+done
+
 xl network-attach 0 ip=10.137.99.1 script=/etc/xen/scripts/vif-route-qubes backend=sys-net
 sleep 2
 dev=$(ls /sys/class/net|sort|head -1)

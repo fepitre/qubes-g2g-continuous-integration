@@ -19,28 +19,19 @@ if [ -z "${SSH_PUB_KEY}" ] || [ ! -e "${SSH_PUB_KEY}" ]; then
   fi
 fi
 
-if [ -z "${GITLAB_RUNNER}" ]; then
-  # Download gitlab-runner
-  # FIXME: check signature
-  GITLAB_RUNNER_VERSION=$(curl -s https://gitlab-runner-downloads.s3.amazonaws.com/latest/index.html \
-    | grep -oP '(?<=href=")[^"]+(?=")' \
-    | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' \
-    | head -1)
-
-  GITLAB_RUNNER="$(mktemp -d)/gitlab-runner"
-
-  wget -o "${GITLAB_RUNNER}" https://gitlab-runner-downloads.s3.amazonaws.com/v${GITLAB_RUNNER_VERSION}/binaries/gitlab-runner-linux-amd64
-fi
-
 virt-customize -a /var/lib/libvirt/images/qubes_4.3_64bit_stable.qcow2 \
+  --copy-in "$LOCAL_DIR/gitlab_runner.repo:/etc/yum.repos.d/" \
+  --copy-in "$LOCAL_DIR/gpgkey:/etc/pki/rpm-gpg/" \
+  --copy-in "$LOCAL_DIR/runner-gitlab-runner-49F16C5CC3A0F81F.pub.gpg:/etc/pki/rpm-gpg/" \
+  --copy-in "$LOCAL_DIR/runner-gitlab-runner-4C80FB51394521E9.pub.gpg:/etc/pki/rpm-gpg/" \
   --run-command "sed -i.bak -e '0,/id=\"00_05\.0\"/{ /id=\"00_05\.0\"/{N;N;d;} }' -e 's|id=\"00_03.0.*::p020000\"|id=\"00_01.0-00_00.0\"|' /var/lib/qubes/qubes.xml" \
-  --run-command "useradd -m -u 11000 gitlab-runner" \
+  --run-command "dnf install --disablerepo=* --enablerepo=fedora --enablerepo=updates --enablerepo=runner_gitlab-runner --setopt=reposdir=/etc/yum.repos.d -y openssh-server dhcp-client git git-lfs gitlab-runner" \
+  --run-command "usermod -u 11000 gitlab-runner" \
+  --run-command "groupmod -g 11000 gitlab-runner" \
   --ssh-inject gitlab-runner:file:"$SSH_PUB_KEY" \
   --run-command "echo 'gitlab-runner ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers" \
-  --copy-in ${GITLAB_RUNNER}:/usr/local/bin/ \
   --mkdir /var/lib/qubes-service/ \
   --touch /var/lib/qubes-service/sshd \
-  --run-command "dnf install --disablerepo=* --enablerepo=fedora --enablerepo=updates --setopt=reposdir=/etc/yum.repos.d -y openssh-server dhcp-client git git-lfs" \
   --copy-in "$LOCAL_DIR/setup-dom0-net.sh":/usr/local/bin/ \
   --copy-in "$LOCAL_DIR/setup-direct-dom0-net.sh":/usr/local/bin/ \
   --chmod 0775:/usr/local/bin/setup-dom0-net.sh \
