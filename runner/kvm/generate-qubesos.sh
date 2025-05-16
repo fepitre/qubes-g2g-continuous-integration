@@ -43,11 +43,12 @@ virt-customize -a /var/lib/libvirt/images/qubes_4.3_64bit_stable.qcow2 \
   --run-command "dnf install --disablerepo=* --enablerepo=fedora --enablerepo=updates --setopt=reposdir=/etc/yum.repos.d -y openssh-server dhcp-client" \
   --copy-in "$LOCAL_DIR/setup-dom0-net.sh":/usr/local/bin/ \
   --copy-in "$LOCAL_DIR/setup-direct-dom0-net.sh":/usr/local/bin/ \
-  --chmod 0755:/usr/local/bin/setup-dom0-net.sh \
-  --chmod 0755:/usr/local/bin/setup-direct-dom0-net.sh \
+  --chmod 0775:/usr/local/bin/setup-dom0-net.sh \
+  --chmod 0775:/usr/local/bin/setup-direct-dom0-net.sh \
   --mkdir /etc/systemd/system/sshd.service.d \
   --copy-in "$LOCAL_DIR/setup-direct-net.service:/etc/systemd/system/"\
   --run-command 'systemctl daemon-reload' \
+  --run-command 'systemctl enable setup-direct-net' \
   --run-command 'systemctl enable sshd'
 
 #  --copy-in "$LOCAL_DIR/custom.conf":/etc/systemd/system/sshd.service.d/ \
