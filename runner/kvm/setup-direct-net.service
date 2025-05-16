@@ -1,0 +1,10 @@
+[Unit]
+Description=Setup network to dom0
+After=network.target multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/setup-direct-dom0-net.sh
+
+[Install]
+WantedBy=multi-user.target

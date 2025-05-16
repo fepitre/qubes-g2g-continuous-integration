@@ -18,7 +18,7 @@ qemu-img create -f qcow2 -F qcow2 -b "$BASE_VM_IMAGE" "$VM_IMAGE"
 # Install the VM
 virt-install \
     --name "$VM_ID" \
-    --os-variant "${CUSTOM_ENV_VM_OS_VARIANT:-fedora40}" \
+    --os-variant "${CUSTOM_ENV_VM_OS_VARIANT:-fedora41}" \
     --disk "$VM_IMAGE" \
     --import \
     --vcpus="${CUSTOM_ENV_VM_VCPUS:-4}" \
