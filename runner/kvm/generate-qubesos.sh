@@ -26,6 +26,7 @@ virt-customize -a /var/lib/libvirt/images/qubes_4.3_64bit_stable.qcow2 \
   --run-command "sed -i.bak -e '0,/id=\"00_05\.0\"/{ /id=\"00_05\.0\"/{N;N;d;} }' -e 's|id=\"00_03.0.*::p020000\"|id=\"00_01.0-00_00.0\"|' /var/lib/qubes/qubes.xml" \
   --run-command "dnf install --disablerepo=* --enablerepo=fedora --enablerepo=updates --enablerepo=runner_gitlab-runner --setopt=reposdir=/etc/yum.repos.d -y openssh-server dhcp-client git git-lfs gitlab-runner" \
   --run-command "usermod -u 11000 gitlab-runner" \
+  --run-command "usermod -aG qubes gitlab-runner" \
   --run-command "groupmod -g 11000 gitlab-runner" \
   --ssh-inject gitlab-runner:file:"$SSH_PUB_KEY" \
   --run-command "echo 'gitlab-runner ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers" \
