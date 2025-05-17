@@ -23,7 +23,6 @@ virt-customize -a /var/lib/libvirt/images/qubes_4.3_64bit_stable.qcow2 \
   --copy-in "$LOCAL_DIR/gitlab_runner.repo:/etc/yum.repos.d/" \
   --copy-in "$LOCAL_DIR/gpgkey:/etc/pki/rpm-gpg/" \
   --copy-in "$LOCAL_DIR/runner-gitlab-runner-49F16C5CC3A0F81F.pub.gpg:/etc/pki/rpm-gpg/" \
-  --copy-in "$LOCAL_DIR/runner-gitlab-runner-4C80FB51394521E9.pub.gpg:/etc/pki/rpm-gpg/" \
   --run-command "sed -i.bak -e '0,/id=\"00_05\.0\"/{ /id=\"00_05\.0\"/{N;N;d;} }' -e 's|id=\"00_03.0.*::p020000\"|id=\"00_01.0-00_00.0\"|' /var/lib/qubes/qubes.xml" \
   --run-command "dnf install --disablerepo=* --enablerepo=fedora --enablerepo=updates --enablerepo=runner_gitlab-runner --setopt=reposdir=/etc/yum.repos.d -y openssh-server dhcp-client git git-lfs gitlab-runner" \
   --run-command "usermod -u 11000 gitlab-runner" \
@@ -40,4 +39,5 @@ virt-customize -a /var/lib/libvirt/images/qubes_4.3_64bit_stable.qcow2 \
   --copy-in "$LOCAL_DIR/setup-direct-net.service":/etc/systemd/system/ \
   --copy-in "$LOCAL_DIR/custom.conf":/etc/systemd/system/sshd.service.d/ \
   --run-command 'systemctl daemon-reload' \
-  --run-command 'systemctl enable sshd'
+  --run-command 'systemctl enable sshd' \
+  --run-command 'rm -rf /etc/pki/rpm-gpg/gpgkey /etc/pki/rpm-gpg/runner-gitlab-runner-49F16C5CC3A0F81F.pub.gpg /etc/yum.repos.d/gitlab_runner.repo'
