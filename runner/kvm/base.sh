@@ -41,7 +41,7 @@ cleanup() {
 
         # Delete VM disk.
         if [ -f "$VM_IMAGE" ]; then
-            rm "$VM_IMAGE"
+            rm -rf "$VM_IMAGE" "${VM_IMAGE}-extra"
         fi
     fi
 

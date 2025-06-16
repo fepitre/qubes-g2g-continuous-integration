@@ -22,6 +22,13 @@ if [[ "$CUSTOM_ENV_VM_IMAGE" =~ ^qubes ]]; then
     --features ioapic.driver=qemu
     --iommu model=intel,driver.intremap="on"
   )
+
+  # extra devices for ansible tests
+  qemu-img create -f qcow2 "${VM_IMAGE}-extra" 1G
+  EXTRA_OPTS+=(
+    --network network=default,model=e1000e \
+    --disk "${VM_IMAGE}-extra" \
+  )
 else
   EXTRA_OPTS=()
 fi

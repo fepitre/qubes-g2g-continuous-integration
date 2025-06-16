@@ -20,6 +20,8 @@ if [ -z "${SSH_PUB_KEY}" ] || [ ! -e "${SSH_PUB_KEY}" ]; then
 fi
 
 virt-customize -a /var/lib/libvirt/images/qubes_4.3_64bit_stable.qcow2 \
+  --run-command "sed -i 's|self.netdevs.extend(self.find_devices_of_class(vm, \"02\"))|self.netdevs.extend(sorted(self.find_devices_of_class(vm, \"02\"))[:1])|' /root/extra-files/qubesteststub/__init__.py" \
+  --run-command 'cd /root/extra-files/ && python3 setup.py build && python3 setup.py install' \
   --copy-in "$LOCAL_DIR/gitlab_runner.repo:/etc/yum.repos.d/" \
   --copy-in "$LOCAL_DIR/gpgkey:/etc/pki/rpm-gpg/" \
   --copy-in "$LOCAL_DIR/runner-gitlab-runner-49F16C5CC3A0F81F.pub.gpg:/etc/pki/rpm-gpg/" \
