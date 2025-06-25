@@ -27,6 +27,7 @@ if [[ "$CUSTOM_ENV_VM_IMAGE" =~ ^qubes ]]; then
   qemu-img create -f qcow2 "${VM_IMAGE}-extra" 1G
   EXTRA_OPTS+=(
     --network network=default,model=e1000e \
+    --network network=default,model=e1000e \
     --disk "${VM_IMAGE}-extra" \
   )
 else
