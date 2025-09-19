@@ -30,8 +30,12 @@ if [[ "$CUSTOM_ENV_VM_IMAGE" =~ ^qubes ]]; then
     --network network=default,model=e1000e \
     --disk "${VM_IMAGE}-extra" \
   )
+  VM_CPU="${CUSTOM_ENV_VM_VCPUS:-4}"
+  VM_MEMORY="${CUSTOM_ENV_VM_MEMORY:-16384}"
 else
   EXTRA_OPTS=()
+  VM_CPU="${CUSTOM_ENV_VM_VCPUS:-4}"
+  VM_MEMORY="${CUSTOM_ENV_VM_MEMORY:-8192}"
 fi
 
 echo "Extra options: ${EXTRA_OPTS[@]}"
@@ -39,10 +43,10 @@ echo "Extra options: ${EXTRA_OPTS[@]}"
 virt-install \
     --name "$VM_ID" \
     --os-variant "${CUSTOM_ENV_VM_OS_VARIANT:-fedora41}" \
-    --disk       "$VM_IMAGE" \
+    --disk       "${VM_IMAGE}" \
     --import \
-    --vcpus      "${CUSTOM_ENV_VM_VCPUS:-4}" \
-    --ram        "${CUSTOM_ENV_VM_MEMORY:-8192}" \
+    --vcpus      "${VM_CPU}" \
+    --ram        "${VM_MEMORY}" \
     --network    network=default,model=e1000e \
     --graphics   none \
     --noautoconsole \
