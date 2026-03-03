@@ -3,6 +3,7 @@ LABEL maintainer="Frédéric Pierret <frederic.pierret@qubes-os.org>"
 
 RUN dnf -y install \
     ca-certificates \
+    cairo-gobject-devel \
     createrepo \
     curl \
     debootstrap \
