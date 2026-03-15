@@ -6,12 +6,12 @@ LOCAL_DIR="$(dirname "$0")"
 SSH_PUB_KEY="${1:-}"
 
 if [ -z "${SSH_PUB_KEY}" ] || [ ! -e "${SSH_PUB_KEY}"]; then
-  if [ -e /home/gitlab-runner/.ssh/id_rsa.pub ]; then
-    SSH_PUB_KEY=/home/gitlab-runner/.ssh/id_rsa.pub
-  elif [ -e /var/lib/gitlab-runner/.ssh/id_rsa.pub ]; then
-    SSH_PUB_KEY=/var/lib/gitlab-runner/.ssh/id_rsa.pub
-  elif [ -e "$LOCAL_DIR"/id_rsa.pub ]; then
-    SSH_PUB_KEY="$LOCAL_DIR"/id_rsa.pub
+  if [ -e /home/gitlab-runner/.ssh/id_ed25519.pub ]; then
+    SSH_PUB_KEY=/home/gitlab-runner/.ssh/id_ed25519.pub
+  elif [ -e /var/lib/gitlab-runner/.ssh/id_ed25519.pub ]; then
+    SSH_PUB_KEY=/var/lib/gitlab-runner/.ssh/id_ed25519.pub
+  elif [ -e "$LOCAL_DIR"/id_ed25519.pub ]; then
+    SSH_PUB_KEY="$LOCAL_DIR"/id_ed25519.pub
   else
     echo "Cannot find gitlab-runner's SSH public key."
     exit 1
@@ -21,7 +21,7 @@ fi
 PACKAGES="$(tr '\n' ',' < "${LOCAL_DIR}/packages_fedora.list")"
 PACKAGES="${PACKAGES%,}"
 
-virt-builder fedora-40 \
+virt-builder fedora-43 \
     --smp 4 \
     --memsize 4096 \
     --size 80G \
