@@ -8,12 +8,12 @@ SSH_PUB_KEY="${2:-}"
 GITLAB_RUNNER="${3:-}"
 
 if [ -z "${SSH_PUB_KEY}" ] || [ ! -e "${SSH_PUB_KEY}" ]; then
-  if [ -e /home/gitlab-runner/.ssh/id_rsa.pub ]; then
-    SSH_PUB_KEY=/home/gitlab-runner/.ssh/id_rsa.pub
-  elif [ -e /var/lib/gitlab-runner/.ssh/id_rsa.pub ]; then
-    SSH_PUB_KEY=/var/lib/gitlab-runner/.ssh/id_rsa.pub
-  elif [ -e "$LOCAL_DIR"/id_rsa.pub ]; then
-    SSH_PUB_KEY="$LOCAL_DIR"/id_rsa.pub
+  if [ -e /home/gitlab-runner/.ssh/id_ed25519.pub ]; then
+    SSH_PUB_KEY=/home/gitlab-runner/.ssh/id_ed25519.pub
+  elif [ -e /var/lib/gitlab-runner/.ssh/id_ed25519.pub ]; then
+    SSH_PUB_KEY=/var/lib/gitlab-runner/.ssh/id_ed25519.pub
+  elif [ -e "$LOCAL_DIR"/id_ed25519.pub ]; then
+    SSH_PUB_KEY="$LOCAL_DIR"/id_ed25519.pub
   else
     echo "Cannot find gitlab-runner's SSH public key."
     exit 1
