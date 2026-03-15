@@ -12,10 +12,10 @@ else
     BASE_VM_IMAGE="$VM_IMAGES_PATH/gitlab-runner-fedora.qcow2"
 fi
 
-if [ -e /home/gitlab-runner/.ssh/id_rsa ]; then
-  SSH_KEY=/home/gitlab-runner/.ssh/id_rsa
-elif [ -e /var/lib/gitlab-runner/.ssh/id_rsa ]; then
-  SSH_KEY=/var/lib/gitlab-runner/.ssh/id_rsa
+if [ -e /home/gitlab-runner/.ssh/id_ed25519 ]; then
+  SSH_KEY=/home/gitlab-runner/.ssh/id_ed25519
+elif [ -e /var/lib/gitlab-runner/.ssh/id_ed25519 ]; then
+  SSH_KEY=/var/lib/gitlab-runner/.ssh/id_ed25519
 else
   echo "Cannot find gitlab-runner's SSH public key."
   exit 1
