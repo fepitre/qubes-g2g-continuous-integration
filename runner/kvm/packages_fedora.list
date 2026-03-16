@@ -1,5 +1,4 @@
 asciidoc
-createrepo
 createrepo_c
 cryptsetup
 curl
@@ -25,6 +24,7 @@ libxslt-devel
 m4
 mock
 openssh-server
+openssl
 pacman
 pandoc
 passwd
@@ -33,6 +33,7 @@ perl-Digest-MD5
 perl-Digest-SHA
 pkg-config
 podman
+python3-click
 python3-coverage
 python3-docker
 python3-gobject
@@ -48,6 +49,7 @@ python3-pytest-asyncio
 python3-pyxdg
 python3-pyyaml
 python3-sh
+rb_libtorrent-examples
 reprepro
 rpm
 rpm-build
