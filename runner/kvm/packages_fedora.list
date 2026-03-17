@@ -1,4 +1,5 @@
 asciidoc
+cairo-gobject-devel
 createrepo_c
 cryptsetup
 curl
