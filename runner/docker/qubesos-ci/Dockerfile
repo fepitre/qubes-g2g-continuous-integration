@@ -12,6 +12,7 @@ RUN dnf -y install \
     e2fsprogs \
     gcc-c++ \
     git \
+    gobject-introspection-devel \
     gpg \
     grub2-tools \
     hunspell \

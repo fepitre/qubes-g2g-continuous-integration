@@ -12,6 +12,7 @@ gcc-c++
 git
 git-lfs
 gitlab-runner
+gobject-introspection-devel
 gpg
 grub2-tools
 gtk-layer-shell
