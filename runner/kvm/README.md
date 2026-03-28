@@ -31,7 +31,20 @@ dnf install libguestfs-tools virt-manager virt-install virt-viewer libguestfs-xf
 For a user to be able to run build in userspace, add it to the `libvirt` and `kvm` groups (see [https://wiki.debian.org/KVM](https://wiki.debian.org/KVM)):
 
 ```shell
-usermod -aG kvm user
+usermod -aG libvirt kvm user
+```
+
+On Debian/Ubuntu, the kernel images in `/boot` are not world-readable by default, which causes `supermin` (used internally by libguestfs) to fail. Make them readable:
+
+```shell
+chmod 644 /boot/vmlinuz-*
+```
+
+Also ensure `gitlab-runner` can write to the libvirt images directory:
+
+```shell
+chgrp libvirt /var/lib/libvirt/images
+chmod g+w /var/lib/libvirt/images
 ```
 
 ### Solve MSRs issues
@@ -58,9 +71,19 @@ Add `gitlab-runner` to `libvirt` and `kvm` groups.
 
 ### Configuration
 
-Clone current project repository to `/opt`. Ensure that `root` has SSH keys generated (`/root/.ssh/id_rsa.pub` will be injected inside the ephemeral VM to allow root send command through SSH).
-Generate the VM that will be used as template for runner jobs with the script `generate-fedora.sh`. It will create the `qcow2` image at `/var/lib/libvirt/images/gitlab-runner-fedora.qcow2`.
-Ensure that permission makes `libvirt` accessing the image like `666`.
+Clone current project repository to `/opt`.
+Ensure that `gitlab-runner` has SSH keys generated.
+Its public key (`/home/gitlab-runner/.ssh/id_ed25519.pub`) will be injected inside the ephemeral VM to allow the runner to connect via SSH.
+Generate the VM template used for runner jobs by running the script **from its own directory** as the `gitlab-runner` user:
+
+```shell
+cd /opt/qubes-g2g-continuous-integration/runner/kvm
+sudo -u gitlab-runner bash generate-fedora.sh
+```
+
+> **Note:** The script must be run as a non-root user (e.g. `gitlab-runner`). Running it as root causes `passt` (the libguestfs network helper) to drop privileges to `nobody`, which then fails to write its PID file.
+
+This will create the `qcow2` image at `/var/lib/libvirt/images/gitlab-runner-fedora.qcow2`.
 
 Register current machine as `custom` runner to your Gitlab instance and once this is done, edit the file `/etc/gitlab-runner/config.toml` and add the corresponding fields like:
 ```toml
