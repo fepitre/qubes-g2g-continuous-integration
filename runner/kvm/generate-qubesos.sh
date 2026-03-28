@@ -45,3 +45,6 @@ virt-customize -a "${QUBES_IMAGE}" \
   --run-command 'systemctl daemon-reload' \
   --run-command 'systemctl enable sshd' \
   --run-command 'rm -rf /etc/pki/rpm-gpg/gpgkey /etc/pki/rpm-gpg/runner-gitlab-runner-49F16C5CC3A0F81F.pub.gpg /etc/yum.repos.d/gitlab_runner.repo'
+
+chown libvirt-qemu:kvm "${QUBES_IMAGE}"
+chmod 660 "${QUBES_IMAGE}"

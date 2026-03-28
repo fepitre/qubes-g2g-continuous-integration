@@ -52,3 +52,6 @@ virt-builder fedora-42 \
     --run-command "sed -i -e 's/^##\(activate = 1\|.*default_sect\|.*legacy_sect\)/\1/' /etc/pki/tls/openssl.cnf" \
     --root-password password:root \
     --update
+
+chown libvirt-qemu:kvm /var/lib/libvirt/images/gitlab-runner-fedora.qcow2
+chmod 660 /var/lib/libvirt/images/gitlab-runner-fedora.qcow2
