@@ -1,29 +1,7 @@
 #!/bin/bash
-
-# Unified VM image generator for GitLab CI runner templates.
+# See README.md for usage and documentation.
 # Must be run as root (e.g. via sudo).
-#
-# All images are stored in /var/lib/libvirt/images/ with the following names:
-#   fedora         -> gitlab-runner-fedora.qcow2
-#   debian         -> gitlab-runner-debian.qcow2
-#   qubesos        -> qubes_4.3_64bit_stable.qcow2
-#   qubesos-debian -> qubes_debian_4.3_64bit_stable.qcow2
-#
-# Usage:
-#   sudo ./generate-vm.sh fedora
-#   sudo ./generate-vm.sh debian
-#   sudo ./generate-vm.sh qubesos                                              # auto-download latest from OpenQA
-#   sudo ./generate-vm.sh qubesos-debian                                       # auto-download latest from OpenQA
-#   sudo ./generate-vm.sh qubesos /var/lib/libvirt/images/qubes.qcow2          # use existing local image
-#   sudo ./generate-vm.sh qubesos-debian /var/lib/libvirt/images/qubes.qcow2
-#
-# For qubesos and qubesos-debian, if no image path is given the latest passing
-# image is downloaded automatically from OpenQA (install_unencrypted_full_upload
-# and install_unencrypted_debian_upload respectively). Downloads support resume
-# and are verified against size and MD5 checksum.
-#
-# Environment variables:
-#   DEBUG=1   Enable verbose libguestfs output (LIBGUESTFS_DEBUG + LIBGUESTFS_TRACE)
+# Pass --debug as first argument to enable verbose libguestfs output.
 
 set -eo pipefail
 
@@ -31,20 +9,23 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VM_IMAGES_PATH="/var/lib/libvirt/images"
 OPENQA_BASE_URL="https://openqa.qubes-os.org"
 OPENQA_API="$OPENQA_BASE_URL/api/v1"
-
-# Set DEBUG=1 to enable verbose libguestfs output (LIBGUESTFS_DEBUG + LIBGUESTFS_TRACE)
-if [ "${DEBUG:-0}" = "1" ]; then
-    export LIBGUESTFS_DEBUG=1
-    export LIBGUESTFS_TRACE=1
-fi
+LIBGUESTFS_EXTRA_VARS=""
 
 #
 # Argument parsing
 #
 
+# Optional --debug flag (must be first argument)
+if [ "${1:-}" = "--debug" ]; then
+    LIBGUESTFS_EXTRA_VARS="export LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1"
+    shift
+else
+    LIBGUESTFS_EXTRA_VARS=""
+fi
+
 VM_TYPE="${1:-}"
 if [ -z "$VM_TYPE" ]; then
-    echo "Usage: $0 <fedora|debian|qubesos|qubesos-debian> [/var/lib/libvirt/images/image.qcow2]"
+    echo "Usage: $0 [--debug] <fedora|debian|qubesos|qubesos-debian> [version] [/var/lib/libvirt/images/image.qcow2]"
     exit 1
 fi
 
@@ -85,15 +66,16 @@ echo "Using SSH public key: $SSH_PUB_KEY"
 #
 
 # Download the latest passing image for a given OpenQA test name.
-# Supports resuming interrupted downloads and verifies size + MD5 checksum.
-# Usage: download_openqa_image <test_name> <output_path>
+# Supports resuming interrupted downloads and verifies size on completion.
+# Usage: download_openqa_image <test_name> <version> <output_path>
 download_openqa_image() {
     local test_name="$1"
-    local output_path="$2"
+    local version="$2"
+    local output_path="$3"
 
-    echo "Querying OpenQA for latest passing '$test_name' job..."
+    echo "Querying OpenQA for latest passing '$test_name' (version $version) job..."
     local job_id asset_name
-    job_id=$(curl -fsSL "$OPENQA_API/jobs?distri=qubesos&version=4.3&latest=1&groupid=1&test=$test_name" \
+    job_id=$(curl -fsSL "$OPENQA_API/jobs?distri=qubesos&version=${version}&latest=1&groupid=1&test=$test_name" \
         | python3 -c "
 import sys, json
 jobs = json.load(sys.stdin)['jobs']
@@ -113,33 +95,18 @@ print(assets[0])
 
     local url="$OPENQA_BASE_URL/assets/hdd/$asset_name"
 
-    # Get expected size and MD5 (ETag) from the server
-    local expected_size expected_md5
+    # Get expected size from the OpenQA assets API
+    local expected_size
     expected_size=$(curl -fsSL "$OPENQA_API/assets/hdd/$asset_name" \
         | python3 -c "import sys, json; print(json.load(sys.stdin)['size'])")
-    expected_md5=$(curl -fsSI "$url" \
-        | grep -i '^etag:' | grep -oE '[0-9a-f]{32}' || true)
 
-    # Check if existing file is already complete and valid
+    # Check if existing file is already complete
     if [ -f "$output_path" ]; then
         local actual_size
         actual_size=$(stat -c '%s' "$output_path")
         if [ "$actual_size" -eq "$expected_size" ]; then
-            echo "File already complete ($actual_size bytes), verifying checksum..."
-            if [ -n "$expected_md5" ]; then
-                local actual_md5
-                actual_md5=$(md5sum "$output_path" | awk '{print $1}')
-                if [ "$actual_md5" = "$expected_md5" ]; then
-                    echo "Checksum OK, skipping download."
-                    return 0
-                else
-                    echo "Checksum mismatch (expected $expected_md5, got $actual_md5), re-downloading..."
-                    rm -f "$output_path"
-                fi
-            else
-                echo "Size OK, no checksum available, skipping download."
-                return 0
-            fi
+            echo "File already complete ($actual_size bytes), skipping download."
+            return 0
         else
             echo "Partial file found ($actual_size / $expected_size bytes), resuming..."
         fi
@@ -155,18 +122,7 @@ print(assets[0])
         echo "ERROR: Size mismatch after download (expected $expected_size, got $actual_size)."
         exit 1
     fi
-
-    # Verify MD5 after download
-    if [ -n "$expected_md5" ]; then
-        echo "Verifying checksum..."
-        local actual_md5
-        actual_md5=$(md5sum "$output_path" | awk '{print $1}')
-        if [ "$actual_md5" != "$expected_md5" ]; then
-            echo "ERROR: Checksum mismatch (expected $expected_md5, got $actual_md5)."
-            exit 1
-        fi
-        echo "Checksum OK."
-    fi
+    echo "Size verified ($actual_size bytes)."
 
     echo "Saved to $output_path"
 }
@@ -177,19 +133,20 @@ print(assets[0])
 
 generate_fedora() {
     local ssh_pub_key="$1"
-    local output="$VM_IMAGES_PATH/gitlab-runner-fedora.qcow2"
+    local version="$2"
+    local output="$VM_IMAGES_PATH/gitlab-runner-fedora-${version}.qcow2"
     local packages
     packages="$(tr '\n' ',' < "$SCRIPT_DIR/packages_fedora.list")"
     packages="${packages%,}"
 
     cd "$SCRIPT_DIR"
-    virt-builder fedora-42 \
+    virt-builder "fedora-${version}" \
         --smp 4 \
         --memsize 4096 \
         --size 80G \
         --output "$output" \
         --format qcow2 \
-        --hostname gitlab-runner-fedora \
+        --hostname "gitlab-runner-fedora-${version}" \
         --network \
         --run-command "rm -rf /etc/yum.repos.d/*modular*.repo /etc/yum.repos.d/fedora-cisco-openh264.repo; " \
         --copy-in "gitlab_runner.repo:/etc/yum.repos.d/" \
@@ -218,36 +175,32 @@ generate_fedora() {
 
 generate_debian() {
     local ssh_pub_key="$1"
-    local output="$VM_IMAGES_PATH/gitlab-runner-debian.qcow2"
+    local version="$2"
+    local output="$VM_IMAGES_PATH/gitlab-runner-debian-${version}.qcow2"
 
-    virt-builder debian-12 \
+    virt-builder "debian-${version}" \
         --size 80G \
         --output "$output" \
         --format qcow2 \
-        --hostname gitlab-runner-debian \
+        --hostname "gitlab-runner-debian-${version}" \
         --network \
-        --run-command "ln -s /dev/sda /dev/vda" \
         --update \
-        --run-command "sed -i 's/bookworm/trixie/g' /etc/apt/sources.list" \
-        --run-command "apt-get update" \
-        --run-command "DEBIAN_FRONTEND=noninteractive DEBIAN_PRIORITY=critical DEBCONF_NOWARNINGS=yes apt-get -y -o 'Dpkg::Options::=--force-confnew' full-upgrade" \
-        --install curl,sudo,coreutils,dpkg-dev,debootstrap \
-        --install git,python3-sh,wget,rpm,devscripts,rsync,python3-packaging,createrepo-c,gpg,python3-yaml,docker.io,python3-docker,reprepro,python3-pathspec,mktorrent,openssl,tree,python3-setuptools,python3-lxml \
-        --run-command "grub-install /dev/sda" \
+        --run-command "ln -s /dev/sda /dev/vda" \
+        --run-command "mkdir -p /etc/apt/keyrings" \
         --run-command "curl -fsSL https://packages.gitlab.com/runner/gitlab-runner/gpgkey | gpg --dearmor -o /etc/apt/keyrings/gitlab-runner.gpg" \
         --run-command "echo 'deb [signed-by=/etc/apt/keyrings/gitlab-runner.gpg] https://packages.gitlab.com/runner/gitlab-runner/debian/ trixie main' > /etc/apt/sources.list.d/gitlab-runner.list" \
         --run-command "curl -fsSL https://packagecloud.io/github/git-lfs/gpgkey | gpg --dearmor -o /etc/apt/keyrings/git-lfs.gpg" \
         --run-command "echo 'deb [signed-by=/etc/apt/keyrings/git-lfs.gpg] https://packagecloud.io/github/git-lfs/debian/ trixie main' > /etc/apt/sources.list.d/git-lfs.list" \
         --run-command "apt-get update" \
-        --run-command 'useradd -m -u 11000 -p "" gitlab-runner -s /bin/bash' \
-        --install gitlab-runner,git,git-lfs,openssh-server \
+        --run-command "DEBIAN_FRONTEND=noninteractive apt-get install -y curl,sudo,coreutils,dpkg-dev,debootstrap,git,python3-sh,wget,rpm,devscripts,rsync,python3-packaging,createrepo-c,gpg,python3-yaml,docker.io,python3-docker,reprepro,python3-pathspec,mktorrent,openssl,tree,python3-setuptools,python3-lxml,gitlab-runner,git-lfs,openssh-server" \
         --run-command "git lfs install --skip-repo" \
+        --run-command 'useradd -m -u 11000 -p "" gitlab-runner -s /bin/bash' \
         --ssh-inject "gitlab-runner:file:$ssh_pub_key" \
-        --run-command "usermod -u 11000 gitlab-runner" \
         --run-command "groupmod -g 11000 gitlab-runner" \
         --run-command "rm -f /root/.ssh/known_hosts" \
         --run-command "echo 'gitlab-runner ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers" \
         --run-command "sed -E 's/GRUB_CMDLINE_LINUX=\"\"/GRUB_CMDLINE_LINUX=\"net.ifnames=0 biosdevname=0\"/' -i /etc/default/grub" \
+        --run-command "grub-install /dev/sda" \
         --run-command "grub-mkconfig -o /boot/grub/grub.cfg" \
         --run-command "echo 'auto eth0' >> /etc/network/interfaces" \
         --run-command "echo 'allow-hotplug eth0' >> /etc/network/interfaces" \
@@ -292,30 +245,40 @@ generate_qubesos() {
 
 case "$VM_TYPE" in
     fedora)
-        OUTPUT_IMAGE="$VM_IMAGES_PATH/gitlab-runner-fedora.qcow2"
+        VERSION="${2:-42}"
+        OUTPUT_IMAGE="$VM_IMAGES_PATH/gitlab-runner-fedora-${VERSION}.qcow2"
+        SYMLINK="$VM_IMAGES_PATH/gitlab-runner-fedora.qcow2"
         sudo -u gitlab-runner bash -c "
+            $LIBGUESTFS_EXTRA_VARS
             SCRIPT_DIR='$SCRIPT_DIR'
             VM_IMAGES_PATH='$VM_IMAGES_PATH'
             $(declare -f generate_fedora)
-            generate_fedora '$SSH_PUB_KEY'
+            generate_fedora '$SSH_PUB_KEY' '$VERSION'
         "
         ;;
     debian)
-        OUTPUT_IMAGE="$VM_IMAGES_PATH/gitlab-runner-debian.qcow2"
+        VERSION="${2:-13}"
+        OUTPUT_IMAGE="$VM_IMAGES_PATH/gitlab-runner-debian-${VERSION}.qcow2"
+        SYMLINK="$VM_IMAGES_PATH/gitlab-runner-debian.qcow2"
         sudo -u gitlab-runner bash -c "
+            $LIBGUESTFS_EXTRA_VARS
             SCRIPT_DIR='$SCRIPT_DIR'
             VM_IMAGES_PATH='$VM_IMAGES_PATH'
             $(declare -f generate_debian)
-            generate_debian '$SSH_PUB_KEY'
+            generate_debian '$SSH_PUB_KEY' '$VERSION'
         "
         ;;
     qubesos)
-        OUTPUT_IMAGE="${2:-}"
+        VERSION="${2:-4.3}"
+        OUTPUT_IMAGE="${3:-}"
+        SYMLINK="$VM_IMAGES_PATH/qubes_64bit_stable.qcow2"
         if [ -z "$OUTPUT_IMAGE" ]; then
-            OUTPUT_IMAGE="$VM_IMAGES_PATH/qubes_4.3_64bit_stable.qcow2"
-            download_openqa_image "install_unencrypted_full_upload" "$OUTPUT_IMAGE"
+            OUTPUT_IMAGE="$VM_IMAGES_PATH/qubes_${VERSION}_64bit_stable.qcow2"
+            download_openqa_image "install_unencrypted_full_upload" "$VERSION" "$OUTPUT_IMAGE"
         fi
+        chown gitlab-runner:gitlab-runner "$OUTPUT_IMAGE"
         sudo -u gitlab-runner bash -c "
+            $LIBGUESTFS_EXTRA_VARS
             SCRIPT_DIR='$SCRIPT_DIR'
             VM_IMAGES_PATH='$VM_IMAGES_PATH'
             $(declare -f generate_qubesos)
@@ -323,12 +286,16 @@ case "$VM_TYPE" in
         "
         ;;
     qubesos-debian)
-        OUTPUT_IMAGE="${2:-}"
+        VERSION="${2:-4.3}"
+        OUTPUT_IMAGE="${3:-}"
+        SYMLINK="$VM_IMAGES_PATH/qubes_debian_64bit_stable.qcow2"
         if [ -z "$OUTPUT_IMAGE" ]; then
-            OUTPUT_IMAGE="$VM_IMAGES_PATH/qubes_debian_4.3_64bit_stable.qcow2"
-            download_openqa_image "install_unencrypted_debian_upload" "$OUTPUT_IMAGE"
+            OUTPUT_IMAGE="$VM_IMAGES_PATH/qubes_debian_${VERSION}_64bit_stable.qcow2"
+            download_openqa_image "install_unencrypted_debian_upload" "$VERSION" "$OUTPUT_IMAGE"
         fi
+        chown gitlab-runner:gitlab-runner "$OUTPUT_IMAGE"
         sudo -u gitlab-runner bash -c "
+            $LIBGUESTFS_EXTRA_VARS
             SCRIPT_DIR='$SCRIPT_DIR'
             VM_IMAGES_PATH='$VM_IMAGES_PATH'
             $(declare -f generate_qubesos)
@@ -344,5 +311,11 @@ esac
 # Fix ownership and permissions on the output image
 chown libvirt-qemu:kvm "$OUTPUT_IMAGE"
 chmod 660 "$OUTPUT_IMAGE"
+
+# Create versionless symlink if applicable (e.g. gitlab-runner-fedora.qcow2 -> gitlab-runner-fedora-42.qcow2)
+if [ -n "${SYMLINK:-}" ]; then
+    ln -sf "$(basename "$OUTPUT_IMAGE")" "$SYMLINK"
+    echo "Symlink: $SYMLINK -> $(basename "$OUTPUT_IMAGE")"
+fi
 
 echo "Done: $OUTPUT_IMAGE"

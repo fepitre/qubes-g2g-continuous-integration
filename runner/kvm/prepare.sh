@@ -4,13 +4,21 @@
 
 # /opt/libvirt-driver/prepare.sh
 
+set -eo pipefail
+
 currentDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 source "${currentDir}"/base.sh # Get variables from base script.
 
-set -eo pipefail
-
-# trap any error, and mark it as a system failure.
-trap 'cleanup' TERM ERR
+# Trap errors and signals - mark as system failure.
+# Use a flag to prevent re-entrant calls if cleanup itself errors.
+_CLEANING_UP=0
+_trap_cleanup() {
+    if [ "$_CLEANING_UP" = "0" ]; then
+        _CLEANING_UP=1
+        cleanup
+    fi
+}
+trap '_trap_cleanup' TERM ERR
 
 # Copy base disk to use for Job.
 qemu-img create -f qcow2 -F qcow2 -b "$BASE_VM_IMAGE" "$VM_IMAGE"
@@ -38,7 +46,7 @@ else
   VM_MEMORY="${CUSTOM_ENV_VM_MEMORY:-8192}"
 fi
 
-echo "Extra options: ${EXTRA_OPTS[@]}"
+echo "Extra options: ${EXTRA_OPTS[*]}"
 
 virt-install \
     --name "$VM_ID" \

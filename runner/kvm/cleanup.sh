@@ -9,7 +9,8 @@ source "${currentDir}"/base.sh # Get variables from base script.
 
 set -eo pipefail
 
-VM_IP=$(_get_vm_ip)
+# Capture IP before destroying the VM or make it true so a dead VM doesn't abort cleanup
+VM_IP=$(_get_vm_ip) || true
 
 cleanup
 

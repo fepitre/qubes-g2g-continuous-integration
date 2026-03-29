@@ -74,25 +74,54 @@ Add `gitlab-runner` to `libvirt` and `kvm` groups.
 Clone current project repository to `/opt`.
 Ensure that `gitlab-runner` has SSH keys generated.
 Its public key (`/home/gitlab-runner/.ssh/id_ed25519.pub`) will be injected inside the ephemeral VM to allow the runner to connect via SSH.
-Generate the VM template used for runner jobs using the `generate-vm.sh` wrapper, which handles all prerequisites and permissions:
+Generate the VM template used for runner jobs using the `generate-vm.sh` wrapper.
+It must be run as root and handles all prerequisites automatically.
 
 ```shell
 cd /opt/qubes-g2g-continuous-integration/runner/kvm
+
+# Fedora (default version: 42)
 sudo ./generate-vm.sh fedora
+sudo ./generate-vm.sh fedora 41
+
+# Debian (default version: 13 / trixie)
 sudo ./generate-vm.sh debian
-sudo ./generate-vm.sh qubesos                        # downloads latest from OpenQA automatically
-sudo ./generate-vm.sh qubesos-debian                 # downloads latest debian flavor from OpenQA
-sudo ./generate-vm.sh qubesos /path/to/image.qcow2   # use a local image instead
+sudo ./generate-vm.sh debian 12
+
+# Qubes OS standard flavor (default version: 4.3) - auto-downloads latest passing image from OpenQA
+sudo ./generate-vm.sh qubesos
+sudo ./generate-vm.sh qubesos 4.2
+
+# Qubes OS debian flavor (default version: 4.3) - auto-downloads latest passing image from OpenQA
+sudo ./generate-vm.sh qubesos-debian
+sudo ./generate-vm.sh qubesos-debian 4.2
+
+# Use an existing local image instead of downloading
+sudo ./generate-vm.sh qubesos 4.3 /var/lib/libvirt/images/my-qubes.qcow2
+sudo ./generate-vm.sh qubesos-debian 4.3 /var/lib/libvirt/images/my-qubes-debian.qcow2
+
+# Enable verbose libguestfs output
+sudo ./generate-vm.sh --debug fedora
 ```
+
+Output images and their versionless symlinks in `/var/lib/libvirt/images/`:
+
+| Type | Versioned image | Symlink |
+|------|----------------|---------|
+| `fedora` | `gitlab-runner-fedora-42.qcow2` | `gitlab-runner-fedora.qcow2` |
+| `debian` | `gitlab-runner-debian-13.qcow2` | `gitlab-runner-debian.qcow2` |
+| `qubesos` | `qubes_4.3_64bit_stable.qcow2` | `qubes_64bit_stable.qcow2` |
+| `qubesos-debian` | `qubes_debian_4.3_64bit_stable.qcow2` | `qubes_debian_64bit_stable.qcow2` |
 
 The wrapper:
 - Makes `/boot/vmlinuz-*` readable for `supermin` (required on Debian/Ubuntu)
 - Ensures the `libvirt` group has write access to `/var/lib/libvirt/images/`
+- Resolves `gitlab-runner`'s SSH public key and injects it into the VM
 - Runs `virt-builder`/`virt-customize` as `gitlab-runner` (not root) to avoid a `passt` privilege issue
-- For `qubesos` and `qubesos-debian`, automatically downloads the latest passing image from OpenQA (`install_unencrypted_full_upload` and `install_unencrypted_debian_upload` respectively) when no local path is provided
+- For `qubesos` and `qubesos-debian`, downloads the latest passing job from OpenQA (`install_unencrypted_full_upload` / `install_unencrypted_debian_upload`); supports resume and verifies size on completion
+- Fixes ownership of the qubesos image to `gitlab-runner` before customization so `virt-customize` can write to it
 - Sets the final image ownership to `libvirt-qemu:kvm` with mode `660`
-
-This will create the `qcow2` image at `/var/lib/libvirt/images/gitlab-runner-fedora.qcow2`.
+- Creates a versionless symlink pointing to the versioned image
 
 Register current machine as `custom` runner to your Gitlab instance and once this is done, edit the file `/etc/gitlab-runner/config.toml` and add the corresponding fields like:
 ```toml
