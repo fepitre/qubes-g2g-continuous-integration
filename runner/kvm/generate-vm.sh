@@ -4,9 +4,9 @@
 # Must be run as root (e.g. via sudo).
 #
 # All images are stored in /var/lib/libvirt/images/ with the following names:
-#   fedora       -> gitlab-runner-fedora.qcow2
-#   debian       -> gitlab-runner-debian.qcow2
-#   qubesos      -> qubes_4.3_64bit_stable.qcow2
+#   fedora         -> gitlab-runner-fedora.qcow2
+#   debian         -> gitlab-runner-debian.qcow2
+#   qubesos        -> qubes_4.3_64bit_stable.qcow2
 #   qubesos-debian -> qubes_debian_4.3_64bit_stable.qcow2
 #
 # Usage:
@@ -21,6 +21,9 @@
 # image is downloaded automatically from OpenQA (install_unencrypted_full_upload
 # and install_unencrypted_debian_upload respectively). Downloads support resume
 # and are verified against size and MD5 checksum.
+#
+# Environment variables:
+#   DEBUG=1   Enable verbose libguestfs output (LIBGUESTFS_DEBUG + LIBGUESTFS_TRACE)
 
 set -eo pipefail
 
@@ -28,6 +31,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VM_IMAGES_PATH="/var/lib/libvirt/images"
 OPENQA_BASE_URL="https://openqa.qubes-os.org"
 OPENQA_API="$OPENQA_BASE_URL/api/v1"
+
+# Set DEBUG=1 to enable verbose libguestfs output (LIBGUESTFS_DEBUG + LIBGUESTFS_TRACE)
+if [ "${DEBUG:-0}" = "1" ]; then
+    export LIBGUESTFS_DEBUG=1
+    export LIBGUESTFS_TRACE=1
+fi
 
 #
 # Argument parsing
