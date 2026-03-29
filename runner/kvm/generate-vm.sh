@@ -184,15 +184,17 @@ generate_debian() {
         --format qcow2 \
         --hostname "gitlab-runner-debian-${version}" \
         --network \
+        --run-command "ln -sf /dev/sda /dev/vda" \
+        --run-command "echo 'grub-pc grub-pc/install_devices string /dev/sda' | debconf-set-selections" \
+        --run-command "echo 'grub-pc grub-pc/install_devices_empty boolean false' | debconf-set-selections" \
         --update \
-        --run-command "ln -s /dev/sda /dev/vda" \
         --run-command "mkdir -p /etc/apt/keyrings" \
         --run-command "curl -fsSL https://packages.gitlab.com/runner/gitlab-runner/gpgkey | gpg --dearmor -o /etc/apt/keyrings/gitlab-runner.gpg" \
         --run-command "echo 'deb [signed-by=/etc/apt/keyrings/gitlab-runner.gpg] https://packages.gitlab.com/runner/gitlab-runner/debian/ trixie main' > /etc/apt/sources.list.d/gitlab-runner.list" \
         --run-command "curl -fsSL https://packagecloud.io/github/git-lfs/gpgkey | gpg --dearmor -o /etc/apt/keyrings/git-lfs.gpg" \
         --run-command "echo 'deb [signed-by=/etc/apt/keyrings/git-lfs.gpg] https://packagecloud.io/github/git-lfs/debian/ trixie main' > /etc/apt/sources.list.d/git-lfs.list" \
         --run-command "apt-get update" \
-        --run-command "DEBIAN_FRONTEND=noninteractive apt-get install -y curl,sudo,coreutils,dpkg-dev,debootstrap,git,python3-sh,wget,rpm,devscripts,rsync,python3-packaging,createrepo-c,gpg,python3-yaml,docker.io,python3-docker,reprepro,python3-pathspec,mktorrent,openssl,tree,python3-setuptools,python3-lxml,gitlab-runner,git-lfs,openssh-server" \
+        --run-command "DEBIAN_FRONTEND=noninteractive apt-get install -y curl sudo coreutils dpkg-dev debootstrap git python3-sh wget rpm devscripts rsync python3-packaging createrepo-c gpg python3-yaml docker.io python3-docker reprepro python3-pathspec mktorrent openssl tree python3-setuptools python3-lxml gitlab-runner git-lfs openssh-server" \
         --run-command "git lfs install --skip-repo" \
         --run-command 'useradd -m -u 11000 -p "" gitlab-runner -s /bin/bash' \
         --ssh-inject "gitlab-runner:file:$ssh_pub_key" \
