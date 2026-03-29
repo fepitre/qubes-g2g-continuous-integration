@@ -9,4 +9,16 @@ source "${currentDir}"/base.sh # Get variables from base script.
 
 set -eo pipefail
 
+VM_IP=$(_get_vm_ip)
+
 cleanup
+
+# Remove stale known_hosts entries for the ephemeral VM
+if [ -n "$VM_IP" ]; then
+    if [ -e "$HOME/.ssh/known_hosts" ]; then
+        ssh-keygen -f "$HOME/.ssh/known_hosts" -R "$VM_IP" || true
+    fi
+    if [ -e /root/.ssh/known_hosts ]; then
+        ssh-keygen -f /root/.ssh/known_hosts -R "$VM_IP" || true
+    fi
+fi

@@ -72,10 +72,13 @@ for i in $(seq 1 120); do
     sleep 1s
 done
 
-# Cleanup known_hosts
+# Cleanup known_hosts (for current user and root, which GitLab runner uses for artifact upload)
 rm -f "$HOME/.ssh/known_hosts.old"
 if [ -e "$HOME/.ssh/known_hosts" ]; then
     ssh-keygen -f "$HOME/.ssh/known_hosts" -R "$VM_IP"
+fi
+if [ -e /root/.ssh/known_hosts ]; then
+    ssh-keygen -f /root/.ssh/known_hosts -R "$VM_IP"
 fi
 
 # Wait for ssh to become available
