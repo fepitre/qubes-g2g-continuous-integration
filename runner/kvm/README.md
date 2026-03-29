@@ -74,14 +74,23 @@ Add `gitlab-runner` to `libvirt` and `kvm` groups.
 Clone current project repository to `/opt`.
 Ensure that `gitlab-runner` has SSH keys generated.
 Its public key (`/home/gitlab-runner/.ssh/id_ed25519.pub`) will be injected inside the ephemeral VM to allow the runner to connect via SSH.
-Generate the VM template used for runner jobs by running the script **from its own directory** as the `gitlab-runner` user:
+Generate the VM template used for runner jobs using the `generate-vm.sh` wrapper, which handles all prerequisites and permissions:
 
 ```shell
 cd /opt/qubes-g2g-continuous-integration/runner/kvm
-sudo -u gitlab-runner bash generate-fedora.sh
+sudo ./generate-vm.sh fedora
+sudo ./generate-vm.sh debian
+sudo ./generate-vm.sh qubesos                        # downloads latest from OpenQA automatically
+sudo ./generate-vm.sh qubesos-debian                 # downloads latest debian flavor from OpenQA
+sudo ./generate-vm.sh qubesos /path/to/image.qcow2   # use a local image instead
 ```
 
-> **Note:** The script must be run as a non-root user (e.g. `gitlab-runner`). Running it as root causes `passt` (the libguestfs network helper) to drop privileges to `nobody`, which then fails to write its PID file.
+The wrapper:
+- Makes `/boot/vmlinuz-*` readable for `supermin` (required on Debian/Ubuntu)
+- Ensures the `libvirt` group has write access to `/var/lib/libvirt/images/`
+- Runs `virt-builder`/`virt-customize` as `gitlab-runner` (not root) to avoid a `passt` privilege issue
+- For `qubesos` and `qubesos-debian`, automatically downloads the latest passing image from OpenQA (`install_unencrypted_full_upload` and `install_unencrypted_debian_upload` respectively) when no local path is provided
+- Sets the final image ownership to `libvirt-qemu:kvm` with mode `660`
 
 This will create the `qcow2` image at `/var/lib/libvirt/images/gitlab-runner-fedora.qcow2`.
 
