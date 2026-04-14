@@ -1,75 +1,59 @@
-# GitLab Runner Setup
+# QubesOS GitLab CI Runner
 
-### 1. Installation
+Ansible playbook to deploy a GitLab CI runner on Qubes OS.
 
-#### 1.1. Create Management Qube
-Create a qube named `gitlab-ci-admin`. This qube will host all the GitLab Runner configurations and manage the creation of disposable qubes for Continuous Integration (CI) jobs.
+## Architecture
 
-#### 1.2. Create Disposable Qube Template
-Create a disposable qube template named `gitlab-ci-dvm`. This template will be used to create qubes that host the CI jobs.
+- **`fedora-42-xfce`** (`gitlab-ci-dvm`, `gitlab-ci-dvm-fepitre-bot`) — disposable templates for CI job cages
+- **`fedora-42-xfce`** (`gitlab-ci-admin`, ...) — runner admin AppVMs running `gitlab-runner`
 
-> **Note:** Ensure that `gitlab-runner` is installed in the template used for `gitlab-ci-dvm`. This is crucial for performing necessary functions like uploading artifacts.
+Runner admin AppVMs connect to GitLab and dispatch jobs into disposable qubes via the custom executor scripts (`prepare.sh`, `run.sh`, `cleanup.sh`).
 
-### 2. dom0 Setup
+## Prerequisites
 
-#### 2.1. Copy Policy File
-Copy the policy file `50-gitlab-ci.policy` to `/etc/qubes/policy`.
+- dom0 with `qubes-ansible` and the `qubes` connection plugin available
+- `gitlab-runner-linux-amd64` binary copied to `/tmp/` in dom0 (dom0 has no internet access)
+- A vars file with runner tokens (see `group_vars/all.yml` for the full variable reference)
 
-#### 2.2. Tagging Disposable Qubes
-To allow the disposable qube to use the `builderv2` QubesExecutor in the RPC policy, automatically tag them using the following command:
+## Usage
+
+Run from dom0:
+
 ```bash
-qvm-features gitlab-ci-dvm tag-created-vm-with disp-for-executor
+cd runner/qubesos/ansible
+ansible-playbook playbooks/main.yml -e @/path/to/vars.yml
 ```
 
-### 3. gitlab-ci-admin Setup
+Run only specific parts via tags:
 
-#### 3.1. Clone Project Repository
-Clone your project repository into the `/opt` directory in the `gitlab-ci-admin` qube.
+| Tag | What it does |
+|-----|-------------|
+| `executor_template` | Install and configure `fedora-42-xfce` |
+| `runner_admin_template` | Install openssh-server into `fedora-42-xfce` |
+| `ci_dvm` | Create and configure `gitlab-ci-dvm` |
+| `runner_admin` | Create runner AppVMs, register runners, deploy keys |
+| `policy` | Install RPC policy in dom0 |
 
-#### 3.2. Install GitLab Runner
-Install GitLab Runner by following the instructions from the official documentation: [GitLab Runner Installation Guide](https://docs.gitlab.com/runner/install/linux-repository.html). Install it in `/usr/local/bin/`.
+## SSH access to runner AppVMs
 
-#### 3.3. Create `gitlab-runner` User
-Create a user named `gitlab-runner` for running the GitLab Runner service.
+From a machine that can reach dom0 (e.g. `10.13.0.12`), add to `~/.ssh/config`:
 
-#### 3.4. Register GitLab Runner
-Register the current machine as a custom runner with your GitLab instance. Follow the registration steps provided by GitLab. After registration, edit the `/etc/gitlab-runner/config.toml` file to include the following configuration:
-
-```toml
-concurrent = 4
-check_interval = 0
-
-[session_server]
-  session_timeout = 1800
-
-[[runners]]
-  name = "myAwesomeRunner"
-  token = "thisisNOTtheREGISTRATIONtoken"
-  url = "https://gitlab.com"
-  executor = "custom"
-  output_limit = 131072
-  builds_dir = "/home/user/builds"
-  cache_dir = "/home/user/cache"
-  [runners.custom_build_dir]
-  [runners.cache]
-    [runners.cache.s3]
-    [runners.cache.gcs]
-  [runners.custom]
-    prepare_exec = "/opt/qubes-g2g-continuous-integration/runner/qubesos/prepare.sh"
-    run_exec = "/opt/qubes-g2g-continuous-integration/runner/qubesos/run.sh"
-    cleanup_exec = "/opt/qubes-g2g-continuous-integration/runner/qubesos/cleanup.sh"
+```
+Host gitlab-ci-griotte gitlab-ci-amarena
+    User user
+    ProxyCommand ssh user@10.13.0.12 "qvm-run --pass-io -u user %h 'socat - TCP4:localhost:22'"
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
 ```
 
-Move this `config.toml` file to `/rw/config/gitlab-runner/config.toml`.
+Authorized keys are deployed via `runner_admin_authorized_keys` in your vars file.
 
-#### 3.5. Setup systemd Service
-Copy the `gitlab-runner.service` file to `/usr/local/lib/systemd/system/`.
+## Key variables
 
-### 4. gitlab-ci-dvm Setup
-
-#### 4.1. Install GitLab Runner
-Install GitLab Runner by following the instructions from the official documentation: [GitLab Runner Installation Guide](https://docs.gitlab.com/runner/install/linux-repository.html). Install it in `/usr/local/bin/`.
-
-Ensure to have `docker` installed and started.
-
-Further steps for `gitlab-ci-dvm` can be specified as needed, including any specific configurations or scripts required for CI job execution.
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ci_executor_template` | `fedora-42-xfce` | Template for CI job cages |
+| `runner_admin_template` | `fedora-42-xfce` | Template for runner admin AppVMs |
+| `ci_dvm_name` | `gitlab-ci-dvm` | Disposable template name |
+| `runner_admin_names` | see `group_vars/all.yml` | List of runner AppVMs with tokens |
+| `runner_admin_authorized_keys` | `[]` | SSH public keys for runner AppVMs |

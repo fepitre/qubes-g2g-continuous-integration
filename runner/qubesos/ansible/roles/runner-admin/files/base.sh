@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Load runner-specific env (CI_RUNNER_DVM, etc.) written by Ansible
+[ -f /etc/gitlab-ci-runner.env ] && source /etc/gitlab-ci-runner.env
+
 # create DispVM name based on project ID and job ID
 DISPVM_NAME="ci-$CUSTOM_ENV_CI_PROJECT_ID-$CUSTOM_ENV_CI_JOB_ID"
 

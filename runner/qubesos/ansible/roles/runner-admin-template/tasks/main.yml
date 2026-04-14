@@ -1,0 +1,28 @@
+---
+- name: Install runner admin template packages
+  ansible.builtin.dnf:
+    name: "{{ runner_admin_template_packages }}"
+    state: present
+
+- name: Create sshd systemd drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/sshd.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Write qubes-service drop-in for sshd
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/sshd.service.d/30-qubes.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Unit]
+      ConditionPathExists=/var/run/qubes-service/sshd
+
+- name: Enable sshd in template (qubes service controls actual start)
+  ansible.builtin.systemd:
+    name: sshd
+    enabled: true

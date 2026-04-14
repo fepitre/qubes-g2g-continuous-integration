@@ -1,0 +1,254 @@
+---
+- name: Create executor scripts directory
+  ansible.builtin.file:
+    path: "{{ ci_executor_scripts_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install executor scripts
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ ci_executor_scripts_dir }}/{{ item }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - base.sh
+    - prepare.sh
+    - run.sh
+    - cleanup.sh
+
+# bind-dirs: persist builds/cache across AppVM restarts
+- name: Create bind-dirs configuration directory
+  ansible.builtin.file:
+    path: "{{ bind_dirs_conf_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create backing directories under bind-dirs root
+  ansible.builtin.file:
+    path: "{{ bind_dirs_root }}{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ runner_admin_bind_dirs }}"
+
+- name: Write bind-dirs drop-in configuration for runner directories
+  ansible.builtin.copy:
+    dest: "{{ bind_dirs_conf_dir }}/gitlab-runner.conf"
+    owner: root
+    group: root
+    mode: "0644"
+    content: "{{ runner_admin_bind_dirs | map('regex_replace', '^(.*)$', \"binds+=('\\1')\") | join('\\n') + '\\n' }}"
+
+- name: Ensure rc.local exists and is executable
+  ansible.builtin.file:
+    path: "{{ rc_local_path }}"
+    state: touch
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create gitlab-runner persistent config directory
+  ansible.builtin.file:
+    path: /rw/config/gitlab-runner
+    state: directory
+    owner: "{{ gitlab_runner_user }}"
+    group: "{{ gitlab_runner_user }}"
+    mode: "0700"
+
+- name: Create builds directory with correct ownership
+  ansible.builtin.file:
+    path: /home/user/builds
+    state: directory
+    owner: "{{ gitlab_runner_user }}"
+    group: "{{ gitlab_runner_user }}"
+    mode: "0755"
+
+- name: Create cache directory with correct ownership
+  ansible.builtin.file:
+    path: /home/user/cache
+    state: directory
+    owner: "{{ gitlab_runner_user }}"
+    group: "{{ gitlab_runner_user }}"
+    mode: "0755"
+
+# skip download if already present; use version-specific URL when pinned
+- name: Check if gitlab-runner binary is already installed
+  ansible.builtin.stat:
+    path: "{{ gitlab_runner_bin }}"
+  register: _runner_bin_stat
+
+- name: Download gitlab-runner binary (latest)
+  ansible.builtin.get_url:
+    url: "https://gitlab-runner-downloads.s3.amazonaws.com/latest/binaries/gitlab-runner-linux-amd64"
+    dest: "{{ gitlab_runner_bin }}"
+    mode: "0755"
+    owner: root
+    group: root
+  when:
+    - not _runner_bin_stat.stat.exists
+    - gitlab_runner_version == "latest"
+
+- name: Download gitlab-runner binary (pinned version)
+  ansible.builtin.get_url:
+    url: "https://gitlab-runner-downloads.s3.amazonaws.com/{{ gitlab_runner_version }}/binaries/gitlab-runner-linux-amd64"
+    dest: "{{ gitlab_runner_bin }}"
+    mode: "0755"
+    owner: root
+    group: root
+  when:
+    - not _runner_bin_stat.stat.exists
+    - gitlab_runner_version != "latest"
+
+- name: Check if config.toml already exists
+  ansible.builtin.stat:
+    path: "{{ runner_admin_config_toml }}"
+  register: _config_toml_stat
+
+- name: Set _runner_item fact for this host
+  ansible.builtin.set_fact:
+    _runner_item: >-
+      {{ runner_admin_names
+         | selectattr('name', 'equalto', inventory_hostname)
+         | first }}
+
+# path A: runner_tokens defined -> write config.toml from template
+- name: Generate config.toml from runner tokens (path A)
+  ansible.builtin.template:
+    src: config.toml.j2
+    dest: "{{ runner_admin_config_toml }}"
+    owner: "{{ gitlab_runner_user }}"
+    group: "{{ gitlab_runner_user }}"
+    mode: "0600"
+  when:
+    - _runner_item.runner_tokens is defined
+    - _runner_item.runner_tokens | length > 0
+
+# path B: registration_token, no runner_tokens -> call register once
+- name: Register gitlab-runner with GitLab (path B)
+  ansible.builtin.command: >
+    {{ gitlab_runner_bin }} register
+    --non-interactive
+    --url "{{ _runner_item.gitlab_url }}"
+    --registration-token "{{ _runner_item.registration_token }}"
+    --description "{{ _runner_item.runner_description | default('QubesOS CI runner') }}"
+    --tag-list "{{ _runner_item.runner_tags | default([]) | join(',') }}"
+    --executor custom
+    --builds-dir "{{ _runner_item.builds_dir | default(gitlab_runner_workdir + '/builds') }}"
+    --cache-dir "{{ _runner_item.cache_dir | default(gitlab_runner_workdir + '/cache') }}"
+    --custom-prepare-exec "{{ ci_executor_scripts_dir }}/prepare.sh"
+    --custom-run-exec "{{ ci_executor_scripts_dir }}/run.sh"
+    --custom-cleanup-exec "{{ ci_executor_scripts_dir }}/cleanup.sh"
+    --config "{{ runner_admin_config_toml }}"
+  when:
+    - not _config_toml_stat.stat.exists
+    - _runner_item.runner_token | default('') | length == 0
+    - _runner_item.registration_token | default('') | length > 0
+  changed_when: true
+
+# path B only: path A template handles these
+- name: Ensure concurrent is set in config.toml (path B)
+  ansible.builtin.lineinfile:
+    path: "{{ runner_admin_config_toml }}"
+    regexp: '^concurrent\s*='
+    line: "concurrent = {{ _runner_item.concurrent | default(runner_admin_concurrent) }}"
+    insertbefore: BOF
+    state: present
+  when:
+    - not (_runner_item.runner_tokens is defined and _runner_item.runner_tokens | length > 0)
+
+- name: Ensure output_limit is set after [[runners]] header (path B)
+  ansible.builtin.lineinfile:
+    path: "{{ runner_admin_config_toml }}"
+    regexp: '^\s*output_limit\s*='
+    insertafter: '^\[\[runners\]\]'
+    line: "  output_limit = {{ runner_admin_output_limit }}"
+    state: present
+  when:
+    - not (_runner_item.runner_tokens is defined and _runner_item.runner_tokens | length > 0)
+
+- name: Configure split-GPG vault
+  ansible.builtin.copy:
+    dest: /rw/config/gpg-split-domain
+    content: "{{ _runner_item.gpg_vault }}\n"
+    owner: "{{ gitlab_runner_user }}"
+    group: "{{ gitlab_runner_user }}"
+    mode: "0644"
+  when: _runner_item.gpg_vault is defined
+
+- name: Configure Split GPG macros in ~/.rpmmacros
+  ansible.builtin.blockinfile:
+    path: "/home/{{ gitlab_runner_user }}/.rpmmacros"
+    create: true
+    owner: "{{ gitlab_runner_user }}"
+    group: "{{ gitlab_runner_user }}"
+    mode: "0644"
+    marker: "# {mark} ANSIBLE MANAGED - qubes-builder Split GPG"
+    block: |
+      %__gpg /usr/bin/qubes-gpg-client-wrapper
+
+      %__gpg_check_password_cmd   %{__gpg} \
+              gpg --batch --no-verbose -u "%{_gpg_name}" -s
+
+      %__gpg_sign_cmd /bin/sh sh -c '/usr/bin/qubes-gpg-client-wrapper \
+              --batch --no-verbose \
+              %{?_gpg_digest_algo:--digest-algo %{_gpg_digest_algo}} \
+              -u "%{_gpg_name}" -sb %{__plaintext_filename} >%{__signature_filename}'
+  when: _runner_item.gpg_vault is defined
+
+# env file read by executor scripts to get the DVM name for this runner
+- name: Write executor env file
+  ansible.builtin.copy:
+    dest: /etc/gitlab-ci-runner.env
+    owner: root
+    group: root
+    mode: "0644"
+    content: "CI_RUNNER_DVM={{ _runner_item.dvm_name | default(ci_dvm_name) }}\n"
+
+- name: Create systemd unit directory
+  ansible.builtin.file:
+    path: "{{ systemd_unit_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install gitlab-runner systemd service unit
+  ansible.builtin.template:
+    src: gitlab-runner.service.j2
+    dest: "{{ systemd_unit_dir }}/gitlab-runner.service"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload systemd
+
+- name: Enable and start gitlab-runner service
+  ansible.builtin.systemd:
+    name: gitlab-runner
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Ensure .ssh directory exists for runner user
+  ansible.builtin.file:
+    path: "/home/{{ gitlab_runner_user }}/.ssh"
+    state: directory
+    owner: "{{ gitlab_runner_user }}"
+    group: "{{ gitlab_runner_user }}"
+    mode: "0700"
+  when: runner_admin_authorized_keys | length > 0
+
+- name: Install authorized_keys for runner user
+  ansible.builtin.template:
+    src: authorized_keys.j2
+    dest: "/home/{{ gitlab_runner_user }}/.ssh/authorized_keys"
+    owner: "{{ gitlab_runner_user }}"
+    group: "{{ gitlab_runner_user }}"
+    mode: "0600"
+  when: runner_admin_authorized_keys | length > 0

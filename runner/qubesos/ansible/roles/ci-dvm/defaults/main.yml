@@ -1,0 +1,14 @@
+---
+# Path to the bind-dirs configuration drop-in directory (persistent across reboots).
+bind_dirs_conf_dir: /rw/config/qubes-bind-dirs.d
+
+# Root directory for bind-dirs backing store.
+bind_dirs_root: /rw/bind-dirs
+
+# rc.local path for persistent startup configuration.
+rc_local_path: /rw/config/rc.local
+
+# Directories to persist via bind-dirs inside the DVM.
+ci_dvm_bind_dirs:
+  - /var/lib/docker
+  - /builder

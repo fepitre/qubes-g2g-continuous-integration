@@ -1,0 +1,47 @@
+concurrent = {{ _runner_item.concurrent | default(runner_admin_concurrent) }}
+check_interval = 0
+{% if _runner_item.connection_max_age is defined %}
+connection_max_age = "{{ _runner_item.connection_max_age }}"
+{% endif %}
+{% if _runner_item.shutdown_timeout is defined %}
+shutdown_timeout = {{ _runner_item.shutdown_timeout }}
+{% endif %}
+
+[session_server]
+  session_timeout = 1800
+{% for reg in _runner_item.runner_tokens %}
+
+[[runners]]
+  name = "{{ _runner_item.runner_description | default(inventory_hostname) }}"
+  url = "{{ _runner_item.gitlab_url }}"
+{% if reg.runner_id is defined %}
+  id = {{ reg.runner_id }}
+{% endif %}
+  token = "{{ reg.token }}"
+{% if reg.token_obtained_at is defined %}
+  token_obtained_at = {{ reg.token_obtained_at }}
+{% endif %}
+{% if reg.token_expires_at is defined %}
+  token_expires_at = {{ reg.token_expires_at }}
+{% endif %}
+  executor = "custom"
+{% if _runner_item.request_concurrency is defined %}
+  request_concurrency = {{ _runner_item.request_concurrency }}
+{% endif %}
+{% if _runner_item.output_limit is defined %}
+  output_limit = {{ _runner_item.output_limit }}
+{% endif %}
+  builds_dir = "{{ _runner_item.builds_dir | default(gitlab_runner_workdir + '/builds') }}"
+  cache_dir = "{{ _runner_item.cache_dir | default(gitlab_runner_workdir + '/cache') }}"
+  [runners.custom_build_dir]
+  [runners.cache]
+{% if _runner_item.cache_max_upload_size is defined %}
+    MaxUploadedArchiveSize = {{ _runner_item.cache_max_upload_size }}
+{% endif %}
+    [runners.cache.s3]
+    [runners.cache.gcs]
+  [runners.custom]
+    prepare_exec = "{{ ci_executor_scripts_dir }}/prepare.sh"
+    run_exec = "{{ ci_executor_scripts_dir }}/run.sh"
+    cleanup_exec = "{{ ci_executor_scripts_dir }}/cleanup.sh"
+{% endfor %}

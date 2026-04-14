@@ -1,0 +1,6 @@
+{% for section, entries in _dvm_runner.gitconfig.items() %}
+[{{ section }}]
+{% for key, value in entries.items() %}
+	{{ key }} = {{ value }}
+{% endfor %}
+{% endfor %}

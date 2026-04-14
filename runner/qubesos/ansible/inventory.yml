@@ -1,0 +1,26 @@
+---
+# Host names must match actual Qubes VM names.
+# Groups are populated dynamically from variables in group_vars/all.yml.
+
+all:
+  children:
+    local:
+      hosts:
+        localhost:
+          ansible_connection: local
+
+    # Populated from runner_admin_template.
+    runner_admin_templates:
+      hosts: {}
+
+    # Populated from ci_executor_template.
+    ci_executor_templates:
+      hosts: {}
+
+    # Populated from ci_dvm_name and runner dvm_name entries.
+    ci_dvms:
+      hosts: {}
+
+    # Populated from runner_admin_names.
+    runner_admins:
+      hosts: {}

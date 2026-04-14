@@ -1,0 +1,228 @@
+---
+#
+# Populate dynamic inventory from variables.
+# This allows -e overrides to work at runtime without editing inventory.yml.
+#
+- name: Populate dynamic inventory from variables
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Validate runner_admin_names is a non-empty list
+      ansible.builtin.assert:
+        that:
+          - runner_admin_names is sequence
+          - runner_admin_names is not string
+          - (runner_admin_names | length) > 0
+          - runner_admin_names | map(attribute='name') | list | length > 0
+        fail_msg: >-
+          'runner_admin_names' must be a non-empty list of objects with at
+          least a 'name' and 'registration_token' field.
+          Example:
+            runner_admin_names:
+              - name: gitlab-ci-admin
+                gitlab_url: https://gitlab.com
+                registration_token: glrt-XXXX
+      tags: [always, inventory]
+
+    - name: Add runner admin AppVMs to inventory
+      ansible.builtin.add_host:
+        name: "{{ item.name }}"
+        groups: runner_admins
+        ansible_connection: qubes
+      loop: "{{ runner_admin_names }}"
+      loop_control:
+        label: "{{ item.name }}"
+      tags: [always, inventory]
+
+    - name: Add CI DVM to inventory
+      ansible.builtin.add_host:
+        name: "{{ ci_dvm_name }}"
+        groups: ci_dvms
+        ansible_connection: qubes
+      tags: [always, inventory, dvm]
+
+    - name: Add per-runner CI DVMs to inventory
+      ansible.builtin.add_host:
+        name: "{{ item.dvm_name }}"
+        groups: ci_dvms
+        ansible_connection: qubes
+      loop: "{{ runner_admin_names | selectattr('dvm_name', 'defined') | list }}"
+      loop_control:
+        label: "{{ item.dvm_name }}"
+      tags: [always, inventory, dvm]
+
+    - name: Add builder DVM to inventory
+      ansible.builtin.add_host:
+        name: "{{ builder_dvm_name }}"
+        groups: ci_dvms
+        ansible_connection: qubes
+      when: builder_dvm_name | default('') | length > 0
+      tags: [always, inventory, dvm]
+
+    - name: Add CI executor template to inventory
+      ansible.builtin.add_host:
+        name: "{{ ci_executor_template }}"
+        groups: ci_executor_templates
+        ansible_connection: qubes
+      tags: [inventory, template]
+
+    - name: Add runner admin template to inventory
+      ansible.builtin.add_host:
+        name: "{{ runner_admin_template }}"
+        groups: runner_admin_templates
+        ansible_connection: qubes
+      tags: [inventory, template]
+
+#
+# Create qubes and install RPC policies (dom0).
+#
+- name: Create CI runner qubes and install RPC policies (dom0)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+  roles:
+    - ci-dom0
+
+#
+# Set up runner admin template (openssh-server + sshd qubes-service drop-in).
+# Shut down AppVMs first so they restart from the updated template.
+#
+
+- name: Shut down runner admin AppVMs (pre-template-update)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+  tags: [template]
+  tasks:
+    - name: Shut down runner admin AppVMs
+      qubesos:
+        guest: "{{ item.name }}"
+        state: shutdown
+        wait: true
+      loop: "{{ runner_admin_names }}"
+      loop_control:
+        label: "{{ item.name }}"
+      ignore_errors: true
+
+- name: Shut down runner admin template (pre-setup)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+  tags: [template]
+  roles:
+    - role: shutdown
+      vars:
+        shutdown_guest: "{{ runner_admin_template }}"
+
+- name: Install packages into runner admin template
+  hosts: runner_admin_templates
+  connection: qubes
+  gather_facts: false
+  remote_user: root
+  tags: [template]
+  roles:
+    - runner-admin-template
+
+- name: Shut down runner admin template (post-setup)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+  tags: [template]
+  roles:
+    - role: shutdown
+      vars:
+        shutdown_guest: "{{ runner_admin_template }}"
+
+#
+# Set up executor template (docker, gitlab-runner, qubes-builderv2 deps).
+#
+
+- name: Shut down CI DVM (pre-template-update)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+  tags: [template]
+  roles:
+    - role: shutdown
+      vars:
+        shutdown_guest: "{{ ci_dvm_name }}"
+
+- name: Shut down CI executor template (pre-setup)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+  tags: [template]
+  roles:
+    - role: shutdown
+      vars:
+        shutdown_guest: "{{ ci_executor_template }}"
+
+- name: Install packages into CI executor template
+  hosts: ci_executor_templates
+  connection: qubes
+  gather_facts: false
+  remote_user: root
+  tags: [template]
+  roles:
+    - ci-executor-template
+
+- name: Shut down CI executor template (post-setup)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+  tags: [template]
+  roles:
+    - role: shutdown
+      vars:
+        shutdown_guest: "{{ ci_executor_template }}"
+
+#
+# Configure CI DVMs (bind-dirs, RPC scripts for QubesExecutor).
+#
+- name: Configure CI DVM (gitlab-ci-dvm)
+  hosts: ci_dvms
+  connection: qubes
+  gather_facts: false
+  remote_user: root
+  tags: [dvm]
+  roles:
+    - ci-dvm
+
+- name: Shut down CI DVMs (post-setup)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+  tags: [dvm]
+  tasks:
+    - name: Shut down CI DVMs
+      qubesos:
+        guest: "{{ item }}"
+        state: shutdown
+        wait: true
+      loop: >-
+        {{ [ci_dvm_name] +
+           (runner_admin_names | selectattr('dvm_name', 'defined')
+                               | map(attribute='dvm_name') | list) +
+           ([builder_dvm_name] if builder_dvm_name | default('') | length > 0 else []) }}
+      ignore_errors: true
+
+#
+# Configure runner admin AppVMs.
+#
+- name: Configure runner admin AppVMs
+  hosts: runner_admins
+  connection: qubes
+  gather_facts: false
+  remote_user: root
+  tags: [runner]
+  roles:
+    - runner-admin

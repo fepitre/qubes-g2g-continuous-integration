@@ -1,0 +1,45 @@
+{% for runner in runner_admin_names %}
+{% set admin = runner.name %}
+#
+# Runner: {{ admin }}
+#
+
+{% set runner_dvm = runner.dvm_name | default(ci_dvm_name) %}
+# Create disposable CI job cages from the runner's DVM template.
+admin.vm.Create.DispVM      +{{ runner_dvm }}        {{ admin }}                             dom0                                allow
+
+# Manage disposables that this runner admin created.
+admin.vm.Start              *                       {{ admin }}                             @tag:created-by-{{ admin }}         allow   target=dom0
+admin.vm.Kill               *                       {{ admin }}                             @tag:created-by-{{ admin }}         allow   target=dom0
+admin.vm.Remove             *                       {{ admin }}                             @tag:created-by-{{ admin }}         allow   target=dom0
+admin.vm.property.Set       +auto_cleanup           {{ admin }}                             @tag:created-by-{{ admin }}         allow   target=dom0
+
+# Execute job scripts inside the CI job disposable.
+qubes.VMShell               *                       {{ admin }}                             @tag:created-by-{{ admin }}         allow
+{% if runner.gpg_vault is defined %}
+
+# split-GPG access for the runner admin AppVM and disposables it creates.
+qubes.Gpg                   *                       {{ admin }}                             {{ runner.gpg_vault }}               allow
+qubes.Gpg                   *                       @tag:created-by-{{ admin }}             {{ runner.gpg_vault }}               allow
+{% endif %}
+
+#
+# QubesExecutor support: CI job disposable spawns builder disposables
+# (@tag:created-by-{{ admin }} -> builder-dvm -> builder dispvms)
+#
+{% if builder_dvm_name | default('') | length > 0 %}
+admin.vm.CreateDisposable   *                       @tag:created-by-{{ admin }}             {{ builder_dvm_name }}               allow   target=dom0
+admin.vm.CurrentState       *                       @tag:created-by-{{ admin }}             @tag:{{ ci_dvm_executor_tag }}       allow   target=dom0
+admin.vm.Start              *                       @tag:created-by-{{ admin }}             @tag:{{ ci_dvm_executor_tag }}       allow   target=dom0
+admin.vm.Kill               *                       @tag:created-by-{{ admin }}             @tag:{{ ci_dvm_executor_tag }}       allow   target=dom0
+admin.vm.List               *                       @tag:created-by-{{ admin }}             @tag:{{ ci_dvm_executor_tag }}       allow   target=dom0
+qubes.Filecopy              *                       @tag:created-by-{{ admin }}             @tag:{{ ci_dvm_executor_tag }}       allow
+qubesbuilder.FileCopyIn     *                       @tag:created-by-{{ admin }}             @tag:{{ ci_dvm_executor_tag }}       allow
+qubesbuilder.FileCopyOut    *                       @tag:created-by-{{ admin }}             @tag:{{ ci_dvm_executor_tag }}       allow
+qubes.WaitForSession        *                       @tag:created-by-{{ admin }}             @tag:{{ ci_dvm_executor_tag }}       allow
+qubes.VMShell               *                       @tag:created-by-{{ admin }}             @tag:{{ ci_dvm_executor_tag }}       allow
+{% endif %}
+{% if not loop.last %}
+
+{% endif %}
+{% endfor %}

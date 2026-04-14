@@ -1,0 +1,19 @@
+[Unit]
+Description=GitLab Runner
+ConditionFileIsExecutable={{ gitlab_runner_bin }}
+After=network.target
+
+[Service]
+StartLimitInterval=5
+StartLimitBurst=10
+ExecStart={{ gitlab_runner_bin }} "run" \
+    "--working-directory" "{{ gitlab_runner_workdir }}" \
+    "--config" "{{ runner_admin_config_toml }}" \
+    "--service" "gitlab-runner" \
+    "--user" "{{ gitlab_runner_user }}"
+Restart=always
+RestartSec=120
+EnvironmentFile=-/etc/sysconfig/gitlab-runner
+
+[Install]
+WantedBy=multi-user.target

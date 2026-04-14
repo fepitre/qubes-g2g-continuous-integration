@@ -1,0 +1,92 @@
+---
+
+ansible_python_interpreter: /usr/bin/python3
+
+#
+# Runner admin AppVMs
+#
+runner_admin_names:
+  - name: gitlab-ci-admin
+    gitlab_url: https://gitlab.com
+    registration_token: "CHANGE_ME"
+    runner_description: "QubesOS CI runner"
+    runner_tags: []
+
+runner_admin_names_resolved: >-
+  {{ runner_admin_names | map(attribute='name') | list }}
+
+#
+# Disposable template for CI job cages
+#
+ci_dvm_name: gitlab-ci-dvm
+ci_dvm_executor_tag: disp-for-executor
+
+#
+# Template VM that gitlab-ci-dvm is based on
+#
+ci_executor_template: fedora-42-xfce
+
+#
+# Template VM for runner admin AppVMs (needs openssh-server)
+#
+runner_admin_template: fedora-42-xfce
+
+#
+# Label colours
+#
+runner_admin_label: blue
+ci_dvm_label: red
+
+#
+# Private volume sizes
+#
+runner_admin_private_size: "53687091200"   # 50 GiB in bytes
+ci_dvm_private_size: "64424509440"         # 60 GiB in bytes
+builder_dvm_private_size: "32212254720"    # 30 GiB in bytes
+
+#
+# Network
+#
+runner_admin_netvm: sys-firewall
+ci_dvm_netvm: sys-firewall
+#
+# gitlab-runner binary installation
+#
+gitlab_runner_version: latest
+gitlab_runner_bin: /usr/local/bin/gitlab-runner
+gitlab_runner_user: user
+gitlab_runner_workdir: /home/user
+
+#
+# gitlab-runner global config
+#
+runner_admin_concurrent: 4
+runner_admin_output_limit: 131072
+
+#
+# Persistent configuration via bind-dirs (runner admin)
+#
+runner_admin_config_dir: /rw/config/gitlab-runner
+runner_admin_config_toml: /rw/config/gitlab-runner/config.toml
+
+#
+# qubes-builderv2 builder DVM (for QubesExecutor support)
+#
+builder_dvm_name: builder-dvm
+
+#
+# Qubes policy
+#
+qubes_policy_dir: /etc/qubes/policy.d
+install_policy: true
+
+#
+# SSH authorized keys for runner admin AppVMs
+#
+runner_admin_authorized_keys: []
+
+#
+# Volume resize control
+#
+skip_resize_runner_admin_volume: false
+skip_resize_ci_dvm_volume: false

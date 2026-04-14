@@ -11,7 +11,7 @@ trap 'cleanup' TERM ERR
 check_dispvm_name
 
 # create dispvm
-res="$(printf 'name=%s label=red' "$DISPVM_NAME" | qrexec-client-vm -- dom0 admin.vm.Create.DispVM+gitlab-ci-dvm | tr '\0' '_')"
+res="$(printf 'name=%s label=red' "$DISPVM_NAME" | qrexec-client-vm -- dom0 admin.vm.Create.DispVM+${CI_RUNNER_DVM:-gitlab-ci-dvm} | tr '\0' '_')"
 if [ "$res" != "0_" ]; then
     echo "ERROR: Failed to create $DISPVM_NAME: $res"
     exit 1

@@ -1,0 +1,11 @@
+---
+# Whether to install the CI RPC policy file.
+install_policy: true
+
+# Path where Qubes policy files are stored.
+qubes_policy_dir: /etc/qubes/policy.d
+
+# Set to true to skip resizing private volumes after VM creation.
+skip_resize_runner_admin_volume: false
+skip_resize_ci_dvm_volume: false
+skip_resize_builder_dvm_volume: false

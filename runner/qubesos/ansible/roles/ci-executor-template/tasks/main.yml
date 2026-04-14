@@ -1,0 +1,39 @@
+---
+- name: Install CI executor base packages
+  ansible.builtin.dnf:
+    name: "{{ ci_executor_packages }}"
+    state: present
+
+- name: Install CI executor qubes-builderv2 packages
+  ansible.builtin.dnf:
+    name: "{{ ci_executor_qubes_packages }}"
+    state: present
+
+- name: Add user to docker group
+  ansible.builtin.user:
+    name: user
+    groups: docker
+    append: true
+
+- name: Create docker systemd drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/docker.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Write qubes-service drop-in for docker
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/docker.service.d/30-qubes.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Unit]
+      ConditionPathExists=/var/run/qubes-service/docker
+
+- name: Enable docker service
+  ansible.builtin.systemd:
+    name: docker
+    enabled: true

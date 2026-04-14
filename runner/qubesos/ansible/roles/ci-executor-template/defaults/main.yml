@@ -1,0 +1,56 @@
+---
+ci_executor_packages:
+  - git
+  - curl
+  - docker
+  - python3
+
+# Union of dependencies-fedora.txt and dependencies-fedora-qubes-executor.txt
+# from qubes-builderv2, plus Qubes-specific packages.
+ci_executor_qubes_packages:
+  - asciidoc
+  - createrepo_c
+  - debootstrap
+  - devscripts
+  - dnf-plugins-core
+  - dosfstools
+  - dpkg-dev
+  - gnupg2
+  - hostname
+  - m4
+  - mock
+  - openssl
+  - pacman
+  - pbuilder
+  - perl-Digest-MD5
+  - perl-Digest-SHA
+  - podman
+  - pykickstart
+  - python3-click
+  - python3-debian
+  - python3-docker
+  - python3-jinja2-cli
+  - python3-lxml
+  - python3-packaging
+  - python3-pathspec
+  - python3-podman
+  - python3-pyyaml
+  - python3-sh
+  - rb_libtorrent-examples
+  - reprepro
+  - rpm
+  - rpm-build
+  - rpm-sign
+  - rpmdevtools
+  - rsync
+  - sequoia-chameleon-gnupg
+  - sequoia-sq
+  - sequoia-sqv
+  - systemd-udev
+  - tree
+  - wget2-wget
+  - which
+  - qubes-core-agent-networking
+  - qubes-core-agent-dom0-updates
+  - qubes-ansible
+  - qubes-ansible-vm

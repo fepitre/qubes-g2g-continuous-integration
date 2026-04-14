@@ -1,0 +1,3 @@
+---
+runner_admin_template_packages:
+  - openssh-server

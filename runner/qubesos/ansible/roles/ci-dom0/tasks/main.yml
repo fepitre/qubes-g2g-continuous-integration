@@ -1,0 +1,176 @@
+---
+# dom0 kernel update via qubes-dom0-current-testing
+- name: Enable qubes-dom0-current-testing repository
+  ansible.builtin.ini_file:
+    path: /etc/yum.repos.d/qubes-dom0.repo
+    section: qubes-dom0-current-testing
+    option: enabled
+    value: "1"
+  tags: [kernel]
+
+- name: Update dom0 packages
+  ansible.builtin.command: qubes-dom0-update --enablerepo=qubes-dom0-current-testing -y
+  changed_when: true
+  tags: [kernel]
+
+- name: Install kernel-latest and kernel-latest-qubes-vm
+  ansible.builtin.command: >
+    qubes-dom0-update --enablerepo=qubes-dom0-current-testing -y kernel-latest kernel-latest-qubes-vm
+  changed_when: true
+  tags: [kernel]
+
+- name: Install CI executor template via qvm-template
+  ansible.builtin.command: >
+    qvm-template install {{ ci_executor_template }}
+  args:
+    creates: /var/lib/qubes/vm-templates/{{ ci_executor_template }}/root.img
+  tags: [template]
+
+- name: Create CI disposable template (gitlab-ci-dvm)
+  qubesos:
+    guest: "{{ ci_dvm_name }}"
+    state: present
+    label: "{{ ci_dvm_label }}"
+    template: "{{ ci_executor_template }}"
+    vmtype: AppVM
+    properties:
+      template_for_dispvms: true
+      netvm: "{{ ci_dvm_netvm }}"
+  tags: [dvm]
+
+- name: Set private volume size for CI DVM
+  command: >
+    qvm-volume extend {{ ci_dvm_name }}:private {{ ci_dvm_private_size }}
+  when: not skip_resize_ci_dvm_volume | bool
+  changed_when: true
+  tags: [dvm]
+
+# tag lets the QubesExecutor RPC policy identify disposables created from this DVM
+- name: Tag CI DVM for QubesExecutor compatibility
+  command: >
+    qvm-features {{ ci_dvm_name }} tag-created-vm-with {{ ci_dvm_executor_tag }}
+  changed_when: true
+  tags: [dvm]
+
+- name: Enable docker qubes service on CI DVM
+  ansible.builtin.command: >
+    qvm-service {{ ci_dvm_name }} docker on
+  changed_when: true
+  tags: [dvm]
+
+- name: Create per-runner CI disposable templates
+  qubesos:
+    guest: "{{ item.dvm_name }}"
+    state: present
+    label: "{{ ci_dvm_label }}"
+    template: "{{ ci_executor_template }}"
+    vmtype: AppVM
+    properties:
+      template_for_dispvms: true
+      netvm: "{{ ci_dvm_netvm }}"
+  loop: "{{ runner_admin_names | selectattr('dvm_name', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.dvm_name }}"
+  tags: [dvm]
+
+- name: Set private volume size for per-runner CI DVMs
+  command: >
+    qvm-volume extend {{ item.dvm_name }}:private {{ ci_dvm_private_size }}
+  when: not skip_resize_ci_dvm_volume | bool
+  loop: "{{ runner_admin_names | selectattr('dvm_name', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.dvm_name }}"
+  changed_when: true
+  tags: [dvm]
+
+- name: Tag per-runner CI DVMs for QubesExecutor compatibility
+  command: >
+    qvm-features {{ item.dvm_name }} tag-created-vm-with {{ ci_dvm_executor_tag }}
+  loop: "{{ runner_admin_names | selectattr('dvm_name', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.dvm_name }}"
+  changed_when: true
+  tags: [dvm]
+
+- name: Enable docker qubes service on per-runner CI DVMs
+  ansible.builtin.command: >
+    qvm-service {{ item.dvm_name }} docker on
+  loop: "{{ runner_admin_names | selectattr('dvm_name', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.dvm_name }}"
+  changed_when: true
+  tags: [dvm]
+
+# builder-dvm: DVM template used by qubes-builderv2 QubesExecutor to spawn builder disposables
+- name: Create builder DVM template
+  qubesos:
+    guest: "{{ builder_dvm_name }}"
+    state: present
+    label: "{{ ci_dvm_label }}"
+    template: "{{ ci_executor_template }}"
+    vmtype: AppVM
+    properties:
+      template_for_dispvms: true
+      netvm: "{{ ci_dvm_netvm }}"
+  when: builder_dvm_name | default('') | length > 0
+  tags: [dvm]
+
+- name: Set private volume size for builder DVM
+  command: >
+    qvm-volume extend {{ builder_dvm_name }}:private {{ builder_dvm_private_size }}
+  when:
+    - builder_dvm_name | default('') | length > 0
+    - not skip_resize_builder_dvm_volume | bool
+  changed_when: true
+  tags: [dvm]
+
+- name: Tag builder DVM for QubesExecutor compatibility
+  command: >
+    qvm-features {{ builder_dvm_name }} tag-created-vm-with {{ ci_dvm_executor_tag }}
+  when: builder_dvm_name | default('') | length > 0
+  changed_when: true
+  tags: [dvm]
+
+- name: Create runner admin AppVMs
+  qubesos:
+    guest: "{{ item.name }}"
+    state: present
+    label: "{{ runner_admin_label }}"
+    template: "{{ runner_admin_template }}"
+    vmtype: AppVM
+    properties:
+      netvm: "{{ runner_admin_netvm }}"
+      default_dispvm: "{{ item.dvm_name | default(ci_dvm_name) }}"
+  loop: "{{ runner_admin_names }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags: [runner]
+
+- name: Set private volume size for runner admin AppVMs
+  command: >
+    qvm-volume extend {{ item.name }}:private {{ runner_admin_private_size }}
+  when: not skip_resize_runner_admin_volume | bool
+  loop: "{{ runner_admin_names }}"
+  loop_control:
+    label: "{{ item.name }}"
+  changed_when: true
+  tags: [runner]
+
+- name: Enable sshd qubes service on runner admin AppVMs
+  ansible.builtin.command: >
+    qvm-service {{ item.name }} sshd on
+  loop: "{{ runner_admin_names }}"
+  loop_control:
+    label: "{{ item.name }}"
+  changed_when: true
+  tags: [runner]
+
+- name: Install CI runner RPC policy
+  ansible.builtin.template:
+    src: 30-gitlab-ci.policy.j2
+    dest: "{{ qubes_policy_dir }}/30-gitlab-ci.policy"
+    owner: root
+    group: qubes
+    mode: "0664"
+  when: install_policy | bool
+  tags: [policy]
