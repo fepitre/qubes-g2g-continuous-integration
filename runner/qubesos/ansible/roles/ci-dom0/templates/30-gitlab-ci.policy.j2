@@ -38,6 +38,11 @@ qubesbuilder.FileCopyIn     *                       @tag:created-by-{{ admin }} 
 qubesbuilder.FileCopyOut    *                       @tag:created-by-{{ admin }}             @tag:{{ ci_dvm_executor_tag }}       allow
 qubes.WaitForSession        *                       @tag:created-by-{{ admin }}             @tag:{{ ci_dvm_executor_tag }}       allow
 qubes.VMShell               *                       @tag:created-by-{{ admin }}             @tag:{{ ci_dvm_executor_tag }}       allow
+
+# Cleanup: runner admin discovers and kills builder disposables left by a finished CI job.
+admin.vm.List               *                       {{ admin }}                             dom0                                allow
+admin.vm.tag.List           *                       {{ admin }}                             @tag:{{ ci_dvm_executor_tag }}       allow   target=dom0
+admin.vm.Kill               *                       {{ admin }}                             @tag:{{ ci_dvm_executor_tag }}       allow   target=dom0
 {% endif %}
 {% if not loop.last %}
 
