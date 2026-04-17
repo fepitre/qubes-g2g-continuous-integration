@@ -40,6 +40,12 @@
     line: "mount /var/lib/docker -o dev,suid,remount 2>/dev/null || true"
     state: present
 
+- name: Disable SELinux enforcement in rc.local
+  ansible.builtin.lineinfile:
+    path: "{{ rc_local_path }}"
+    line: "setenforce 0"
+    state: present
+
 # QubesExecutor RPC scripts: allow file transfers from runner admin into DVM
 - name: Create /etc/qubes-rpc directory
   ansible.builtin.file:
