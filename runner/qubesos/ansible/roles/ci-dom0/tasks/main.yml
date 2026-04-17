@@ -115,12 +115,20 @@
   when: builder_dvm_name | default('') | length > 0
   tags: [dvm]
 
+- name: Get current private volume size for builder DVM
+  command: qvm-volume info {{ builder_dvm_name }}:private size
+  register: _builder_vol_size
+  changed_when: false
+  when: builder_dvm_name | default('') | length > 0
+  tags: [dvm]
+
 - name: Set private volume size for builder DVM
   command: >
     qvm-volume extend {{ builder_dvm_name }}:private {{ builder_dvm_private_size }}
   when:
     - builder_dvm_name | default('') | length > 0
     - not skip_resize_builder_dvm_volume | bool
+    - (_builder_vol_size.stdout | trim | int) < (builder_dvm_private_size | int)
   changed_when: true
   tags: [dvm]
 
