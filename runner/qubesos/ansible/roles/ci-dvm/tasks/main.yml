@@ -40,6 +40,13 @@
     line: "mount /var/lib/docker -o dev,suid,remount 2>/dev/null || true"
     state: present
 
+# qubes-builderv2 chroots under /builder need working device nodes for /dev/null
+- name: Remount /builder with dev flag in rc.local
+  ansible.builtin.lineinfile:
+    path: "{{ rc_local_path }}"
+    line: "mount /builder -o dev,suid,remount 2>/dev/null || true"
+    state: present
+
 - name: Disable SELinux enforcement in rc.local
   ansible.builtin.lineinfile:
     path: "{{ rc_local_path }}"
