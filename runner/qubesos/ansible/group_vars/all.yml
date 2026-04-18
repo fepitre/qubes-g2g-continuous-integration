@@ -42,7 +42,7 @@ ci_dvm_label: red
 #
 runner_admin_private_size: "53687091200"   # 50 GiB in bytes
 ci_dvm_private_size: "64424509440"         # 60 GiB in bytes
-builder_dvm_private_size: "32212254720"    # 30 GiB in bytes
+builder_dvm_private_size: "64424509440"    # 60 GiB in bytes
 
 #
 # Network
