@@ -11,4 +11,5 @@ rc_local_path: /rw/config/rc.local
 # Directories to persist via bind-dirs inside the DVM.
 ci_dvm_bind_dirs:
   - /var/lib/docker
+  - /var/lib/containerd
   - /builder
