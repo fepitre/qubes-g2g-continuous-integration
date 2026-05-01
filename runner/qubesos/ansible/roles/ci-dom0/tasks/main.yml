@@ -139,6 +139,13 @@
   changed_when: true
   tags: [dvm]
 
+- name: Enable docker qubes service on builder DVM
+  ansible.builtin.command: >
+    qvm-service {{ builder_dvm_name }} docker on
+  when: builder_dvm_name | default('') | length > 0
+  changed_when: true
+  tags: [dvm]
+
 - name: Create runner admin AppVMs
   qubesos:
     guest: "{{ item.name }}"
