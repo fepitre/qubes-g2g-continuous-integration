@@ -1,0 +1,18 @@
+---
+bind_dirs_conf_dir: /rw/config/qubes-bind-dirs.d
+bind_dirs_root: /rw/bind-dirs
+rc_local_path: /rw/config/rc.local
+
+# Only dirs outside /rw need bind-dirs; /rw/config is already persistent.
+runner_admin_bind_dirs:
+  - /home/user/builds
+  - /home/user/cache
+
+runner_admin_config_toml: /rw/config/gitlab-runner/config.toml
+systemd_unit_dir: /usr/local/lib/systemd/system
+
+# Shared config.toml template at ansible/templates/, also used by host-qubesos.
+gitlab_runner_config_template: "{{ role_path }}/../../templates/config.toml.j2"
+
+# qubesos_executor_scripts_dir is provided at play level in playbooks/qubesos.yml
+# so it tracks the qubes_g2g_ci_dest clone path used by the git task.

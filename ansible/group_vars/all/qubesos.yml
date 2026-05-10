@@ -1,0 +1,49 @@
+---
+# Variables specific to the QubesOS runner (qubesos-admin AppVMs and
+# their dom0 orchestration).
+
+qubesos_executor_scripts_dir: "{{ qubes_g2g_ci_dest }}/runner/qubesos"
+
+# Runner-admin AppVM user
+gitlab_runner_user: user
+gitlab_runner_workdir: /home/user
+
+# Template VMs
+ci_executor_template: fedora-42-xfce
+runner_admin_template: fedora-42-xfce
+
+# Disposable VM for CI job cages
+ci_dvm_name: gitlab-ci-dvm
+ci_dvm_executor_tag: disp-for-executor
+ci_dvm_label: red
+ci_dvm_netvm: sys-firewall
+ci_dvm_private_size: "64424509440"   # 60 GiB
+
+# Runner-admin AppVM
+runner_admin_label: blue
+runner_admin_netvm: sys-firewall
+runner_admin_private_size: "53687091200"   # 50 GiB
+
+# gitlab-runner config on AppVM
+runner_admin_concurrent: 4
+runner_admin_output_limit: 131072
+runner_admin_config_dir: /rw/config/gitlab-runner
+runner_admin_config_toml: /rw/config/gitlab-runner/config.toml
+
+# qubes-builderv2 builder DVM (QubesExecutor support)
+builder_dvm_name: builder-dvm
+builder_dvm_private_size: "64424509440"   # 60 GiB
+
+# dom0 RPC policy
+qubes_policy_dir: /etc/qubes/policy.d
+install_policy: true
+
+# AppVM SSH access
+runner_admin_authorized_keys: []
+
+# Volume resize control
+skip_resize_runner_admin_volume: false
+skip_resize_ci_dvm_volume: false
+
+ci_runners_resolved: >-
+  {{ ci_runners | selectattr('executor', 'equalto', 'qubesos') | map(attribute='name') | list }}

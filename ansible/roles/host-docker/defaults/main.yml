@@ -1,0 +1,4 @@
+---
+# Pre-pull declared images on the host before the runner starts. Skip if you
+# manage image lifecycle out of band.
+host_docker_pull_images: true

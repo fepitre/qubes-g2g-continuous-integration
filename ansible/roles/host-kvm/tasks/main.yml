@@ -1,0 +1,144 @@
+---
+- name: Install common host tools
+  ansible.builtin.package:
+    name: "{{ host_kvm_common_tools }}"
+    state: present
+  when: host_kvm_install_common_tools | bool
+  become: true
+
+- name: Install kvm/libvirt/libguestfs packages (Debian/Ubuntu)
+  ansible.builtin.apt:
+    name: "{{ host_kvm_packages_debian }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_os_family == "Debian"
+  become: true
+
+- name: Install kvm/libvirt/libguestfs packages (Fedora/RHEL)
+  ansible.builtin.dnf:
+    name: "{{ host_kvm_packages_redhat }}"
+    state: present
+  when: ansible_os_family == "RedHat"
+  become: true
+
+- name: Install kvm/libvirt/libguestfs packages (openSUSE/SLES)
+  community.general.zypper:
+    name: "{{ host_kvm_packages_suse }}"
+    state: present
+  when: ansible_os_family == "Suse"
+  become: true
+
+- name: Add gitlab-runner user to libvirt and kvm groups
+  ansible.builtin.user:
+    name: "{{ gitlab_runner_user }}"
+    groups: [libvirt, kvm]
+    append: true
+  become: true
+
+# /boot/vmlinuz-* must be world-readable for supermin (libguestfs backend).
+# Default Debian/Ubuntu kernel packages install with mode 0600.
+- name: Make /boot/vmlinuz-* readable for supermin (Debian/Ubuntu)
+  ansible.builtin.shell: |
+    set -e
+    for f in /boot/vmlinuz-*; do
+      [ -f "$f" ] && chmod 644 "$f"
+    done
+  when: ansible_os_family == "Debian"
+  changed_when: true
+  become: true
+
+- name: Grant libvirt group write access to {{ host_kvm_libvirt_images_dir }}
+  ansible.builtin.file:
+    path: "{{ host_kvm_libvirt_images_dir }}"
+    state: directory
+    group: libvirt
+    mode: "0775"
+  become: true
+
+- name: Configure modprobe to ignore unsupported MSRs
+  ansible.builtin.copy:
+    dest: /etc/modprobe.d/kvm.conf
+    content: |
+      options kvm ignore_msrs=1 report_ignored_msrs=0
+    owner: root
+    group: root
+    mode: "0644"
+  when: host_kvm_ignore_msrs | bool
+  become: true
+
+- name: Clone qubes-g2g-continuous-integration on host
+  ansible.builtin.git:
+    repo: "{{ qubes_g2g_ci_repo }}"
+    dest: "{{ qubes_g2g_ci_dest }}"
+    version: "{{ qubes_g2g_ci_version }}"
+    update: true
+    force: true
+  become: true
+
+- name: Ensure repo dir is traversable by gitlab-runner
+  ansible.builtin.file:
+    path: "{{ qubes_g2g_ci_dest }}"
+    state: directory
+    mode: "0755"
+  become: true
+
+- name: Ensure libvirtd is enabled and running
+  ansible.builtin.systemd:
+    name: libvirtd
+    enabled: true
+    state: started
+  become: true
+
+- name: Query libvirt default network state
+  ansible.builtin.command: virsh net-info default
+  register: _virsh_net_info
+  changed_when: false
+  failed_when: false
+  become: true
+
+- name: Start libvirt default network
+  ansible.builtin.command: virsh net-start default
+  when:
+    - _virsh_net_info.rc == 0
+    - "'Active:         no' in _virsh_net_info.stdout"
+  changed_when: true
+  become: true
+
+- name: Autostart libvirt default network
+  ansible.builtin.command: virsh net-autostart default
+  when:
+    - _virsh_net_info.rc == 0
+    - "'Autostart:      no' in _virsh_net_info.stdout"
+  changed_when: true
+  become: true
+
+- name: Ensure gitlab-runner .ssh directory exists
+  ansible.builtin.file:
+    path: "/home/{{ gitlab_runner_user }}/.ssh"
+    state: directory
+    owner: "{{ gitlab_runner_user }}"
+    group: "{{ gitlab_runner_user }}"
+    mode: "0700"
+  become: true
+
+# The pubkey is injected into ephemeral build VMs so gitlab-runner can ssh
+# into them. generate-vm.sh reads it from this path.
+- name: Generate gitlab-runner SSH key if missing
+  ansible.builtin.command:
+    cmd: >-
+      ssh-keygen -t ed25519
+      -f /home/{{ gitlab_runner_user }}/.ssh/id_ed25519
+      -C "{{ gitlab_runner_user }}@{{ inventory_hostname }}"
+      -N ""
+    creates: "/home/{{ gitlab_runner_user }}/.ssh/id_ed25519"
+  become: true
+  become_user: "{{ gitlab_runner_user }}"
+
+# TODO: VM template generation. The role does not run generate-vm.sh
+# automatically because it downloads multi-GB images and takes several
+# minutes. Run manually when adding a new template kind:
+#   sudo {{ kvm_executor_scripts_dir }}/generate-vm.sh fedora
+#   sudo {{ kvm_executor_scripts_dir }}/generate-vm.sh debian
+#   sudo {{ kvm_executor_scripts_dir }}/generate-vm.sh qubesos
+# See runner/kvm/README.md for the full list of kinds.

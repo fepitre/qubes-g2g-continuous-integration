@@ -1,0 +1,61 @@
+---
+#
+# Configure SSH-managed runner hosts (docker and/or kvm executors). Hosts
+# are picked from ci_runners entries with executor != qubesos. Each host's
+# inventory entry must already exist in the active inventory (e.g. via
+# ci-infrastructure/inventory.yml) so connection details are resolved.
+#
+
+- name: Identify SSH-managed runner hosts
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Validate ci_runners
+      ansible.builtin.assert:
+        that:
+          - ci_runners is sequence
+          - ci_runners is not string
+        fail_msg: "ci_runners must be a list (see ansible/group_vars/all.yml)"
+
+    - name: Add SSH-managed runner hosts to dynamic group
+      ansible.builtin.add_host:
+        name: "{{ item }}"
+        groups: ssh_runner_hosts
+      loop: "{{ ci_runners | rejectattr('executor', 'equalto', 'qubesos') | map(attribute='host') | unique | list }}"
+      loop_control:
+        label: "{{ item }}"
+
+- name: Configure runner hosts
+  hosts: ssh_runner_hosts
+  gather_facts: true
+  # Imported by ci-infrastructure/playbooks/bleuet.yml where group_vars is
+  # not auto-loaded; pull the qubes-g2g-continuous-integration defaults in
+  # explicitly. qubesos.yml is intentionally not loaded here (this playbook
+  # only configures non-qubesos runners on SSH-managed hosts).
+  vars_files:
+    - ../group_vars/all/common.yml
+    - ../group_vars/all/kvm.yml
+    - ../group_vars/all/docker.yml
+  tasks:
+    - name: Determine executor types needed on this host
+      ansible.builtin.set_fact:
+        _host_has_docker: "{{ (ci_runners | selectattr('host', 'equalto', inventory_hostname) | selectattr('executor', 'equalto', 'docker') | list | length) > 0 }}"
+        _host_has_kvm: "{{ (ci_runners | selectattr('host', 'equalto', inventory_hostname) | selectattr('executor', 'equalto', 'kvm') | list | length) > 0 }}"
+
+    - name: Set up docker executor
+      ansible.builtin.include_role:
+        name: host-docker
+      when: _host_has_docker
+      tags: [docker]
+
+    - name: Set up kvm executor
+      ansible.builtin.include_role:
+        name: host-kvm
+      when: _host_has_kvm
+      tags: [kvm]
+
+    - name: Render gitlab-runner config.toml
+      ansible.builtin.include_role:
+        name: host-qubesos
+      tags: [config]

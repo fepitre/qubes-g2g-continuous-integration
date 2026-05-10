@@ -1,0 +1,7 @@
+---
+# Variables specific to the Docker runner (host-docker SSH host).
+
+# Default container image for docker runners. Used when a ci_runners
+# entry's docker.image is not explicitly set. The qubesos-ci image
+# bundles the toolchain used by the QubesOS pipelines on bleuet.
+host_docker_default_image: registry.gitlab.com/qubesos/docker-images/qubesos-ci

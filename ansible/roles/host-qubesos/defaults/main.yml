@@ -1,0 +1,12 @@
+---
+gitlab_runner_config_dir: /etc/gitlab-runner
+gitlab_runner_config_toml: /etc/gitlab-runner/config.toml
+
+# Shared config.toml template at ansible/templates/, also used by qubesos-admin.
+# kvm_executor_scripts_dir / qubesos_executor_scripts_dir referenced inside
+# come from host-kvm and qubesos-admin defaults respectively.
+gitlab_runner_config_template: "{{ role_path }}/../../templates/config.toml.j2"
+
+# Default builds/cache locations on the host (overridable per-runner).
+gitlab_runner_builds_dir: /home/gitlab-runner/builds
+gitlab_runner_cache_dir: /home/gitlab-runner/cache

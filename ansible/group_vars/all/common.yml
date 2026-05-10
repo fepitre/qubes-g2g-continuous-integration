@@ -1,0 +1,41 @@
+---
+# Variables common to all runner types (qubesos / kvm / docker).
+
+ansible_python_interpreter: /usr/bin/python3
+
+#
+# Runner inventory (filtered per role by executor / host)
+#
+ci_runners:
+  - name: gitlab-ci-admin
+    host: localhost
+    executor: qubesos
+    gitlab_url: https://gitlab.com
+    registration_token: "CHANGE_ME"
+    runner_description: "QubesOS CI runner"
+    runner_tags: []
+
+ci_runner_hosts: {}
+
+#
+# Source repository ansible clones onto each runner so gitlab-runner can
+# read the executor scripts. qubes_g2g_ci_dest defaults to /opt/... for
+# SSH-managed hosts; the qubesos.yml runner_admin play overrides it to
+# /home/user/... since /home is naturally persistent on QubesOS AppVMs
+# (no bind-dir needed). Override repo / version via -e or your vars file.
+#
+qubes_g2g_ci_repo: https://github.com/fepitre/qubes-g2g-continuous-integration.git
+qubes_g2g_ci_version: master
+qubes_g2g_ci_dest: /opt/qubes-g2g-continuous-integration
+
+#
+# gitlab-runner binary
+#
+gitlab_runner_version: latest
+gitlab_runner_bin: /usr/local/bin/gitlab-runner
+
+#
+# gitlab-runner global config (referenced by the shared config.toml.j2)
+#
+gitlab_runner_session_timeout: 1800
+gitlab_runner_check_interval: 0

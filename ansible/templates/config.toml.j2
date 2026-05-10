@@ -1,0 +1,99 @@
+concurrent = {{ _host_config.concurrent | default(_host_runners | length) }}
+check_interval = {{ _host_config.check_interval | default(gitlab_runner_check_interval) }}
+{% if _host_config.connection_max_age is defined %}
+connection_max_age = "{{ _host_config.connection_max_age }}"
+{% endif %}
+{% if _host_config.shutdown_timeout is defined %}
+shutdown_timeout = {{ _host_config.shutdown_timeout }}
+{% endif %}
+
+[session_server]
+  session_timeout = {{ gitlab_runner_session_timeout }}
+{% for runner in _host_runners %}
+{% for reg in runner.runner_tokens %}
+
+[[runners]]
+  name = "{{ runner.runner_description | default(runner.name) }}"
+  url = "{{ runner.gitlab_url }}"
+{% if reg.runner_id is defined %}
+  id = {{ reg.runner_id }}
+{% endif %}
+  token = "{{ reg.token }}"
+{% if reg.token_obtained_at is defined %}
+  token_obtained_at = {{ reg.token_obtained_at }}
+{% endif %}
+{% if reg.token_expires_at is defined %}
+  token_expires_at = {{ reg.token_expires_at }}
+{% endif %}
+{% if runner.output_limit is defined %}
+  output_limit = {{ runner.output_limit }}
+{% endif %}
+{% if runner.request_concurrency is defined %}
+  request_concurrency = {{ runner.request_concurrency }}
+{% endif %}
+{% if runner.limit is defined %}
+  limit = {{ runner.limit }}
+{% endif %}
+{% if runner.executor == 'docker' %}
+  executor = "docker"
+  [runners.cache]
+{% if runner.cache_max_upload_size is defined %}
+    MaxUploadedArchiveSize = {{ runner.cache_max_upload_size }}
+{% endif %}
+    [runners.cache.s3]
+    [runners.cache.gcs]
+    [runners.cache.azure]
+  [runners.docker]
+    tls_verify = {{ runner.docker.tls_verify | default(false) | string | lower }}
+    image = "{{ runner.docker.image | default(host_docker_default_image) }}"
+    privileged = {{ runner.docker.privileged | default(false) | string | lower }}
+{% if runner.docker.devices is defined %}
+    devices = {{ runner.docker.devices | to_json }}
+{% endif %}
+{% if runner.docker.cap_add is defined %}
+    cap_add = {{ runner.docker.cap_add | to_json }}
+{% endif %}
+{% if runner.docker.volumes is defined %}
+    volumes = {{ runner.docker.volumes | to_json }}
+{% endif %}
+{% if runner.docker.pull_policy is defined %}
+    pull_policy = {{ runner.docker.pull_policy | to_json }}
+{% endif %}
+{% if runner.docker.shm_size is defined %}
+    shm_size = {{ runner.docker.shm_size }}
+{% endif %}
+{% elif runner.executor == 'kvm' %}
+  executor = "custom"
+  builds_dir = "{{ runner.builds_dir | default(gitlab_runner_builds_dir) }}"
+  cache_dir = "{{ runner.cache_dir | default(gitlab_runner_cache_dir) }}"
+  [runners.custom_build_dir]
+  [runners.cache]
+{% if runner.cache_max_upload_size is defined %}
+    MaxUploadedArchiveSize = {{ runner.cache_max_upload_size }}
+{% endif %}
+    [runners.cache.s3]
+    [runners.cache.gcs]
+    [runners.cache.azure]
+  [runners.custom]
+    prepare_exec = "{{ kvm_executor_scripts_dir }}/prepare.sh"
+    run_exec = "{{ kvm_executor_scripts_dir }}/run.sh"
+    cleanup_exec = "{{ kvm_executor_scripts_dir }}/cleanup.sh"
+{% elif runner.executor == 'qubesos' %}
+  executor = "custom"
+  builds_dir = "{{ runner.builds_dir | default(gitlab_runner_builds_dir) }}"
+  cache_dir = "{{ runner.cache_dir | default(gitlab_runner_cache_dir) }}"
+  [runners.custom_build_dir]
+  [runners.cache]
+{% if runner.cache_max_upload_size is defined %}
+    MaxUploadedArchiveSize = {{ runner.cache_max_upload_size }}
+{% endif %}
+    [runners.cache.s3]
+    [runners.cache.gcs]
+    [runners.cache.azure]
+  [runners.custom]
+    prepare_exec = "{{ qubesos_executor_scripts_dir }}/prepare.sh"
+    run_exec = "{{ qubesos_executor_scripts_dir }}/run.sh"
+    cleanup_exec = "{{ qubesos_executor_scripts_dir }}/cleanup.sh"
+{% endif %}
+{% endfor %}
+{% endfor %}

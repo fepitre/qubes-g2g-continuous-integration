@@ -1,0 +1,62 @@
+---
+# kvm_executor_scripts_dir is provided at play level in playbooks/host.yml
+# so both host-kvm and host-qubesos (rendering) see the same value.
+
+# System user that runs gitlab-runner (created by the gitlab-runner package).
+# Added to libvirt and kvm groups so it can drive virsh + access /dev/kvm.
+gitlab_runner_user: gitlab-runner
+
+# Install general-purpose tools listed in runner/kvm/README.md "Common tools"
+# section. Set false if you manage these elsewhere.
+host_kvm_install_common_tools: true
+host_kvm_common_tools:
+  - sudo
+  - tmux
+  - git
+  - vim
+  - htop
+  - iotop
+  - nmon
+  - rsync
+
+# Package lists per OS family. Source: runner/kvm/README.md.
+host_kvm_packages_debian:
+  - libguestfs-tools
+  - virtinst
+  - libguestfs-xfs
+  - qemu-system
+  - libvirt-clients
+  - libvirt-daemon-system
+  - libosinfo-bin
+  - isc-dhcp-client
+
+host_kvm_packages_redhat:
+  - libguestfs-tools
+  - virt-install
+  - libguestfs-xfs
+  - libosinfo
+  - libvirt-daemon-kvm
+  - libvirt
+  - guestfs-tools
+  - dhcp-client
+
+# openSUSE Leap 15.6+/Tumbleweed package names. Older Leap may need
+# libguestfs-tools instead of guestfs-tools.
+host_kvm_packages_suse:
+  - guestfs-tools
+  - virt-install
+  - libvirt
+  - libvirt-client
+  - libvirt-daemon-qemu
+  - qemu-kvm
+  - libosinfo
+  - dhcp-client
+  - xfsprogs
+
+# Where libvirt stores VM disk images. gitlab-runner needs group write
+# access here (via the libvirt group) to drop generated VM images.
+host_kvm_libvirt_images_dir: /var/lib/libvirt/images
+
+# Drop /etc/modprobe.d/kvm.conf with ignore_msrs=1 to silence guest
+# unsupported-MSR access (otherwise floods dmesg on some CPUs).
+host_kvm_ignore_msrs: true

@@ -1,0 +1,233 @@
+---
+#
+# Populate dynamic inventory from variables.
+# This allows -e overrides to work at runtime without editing inventory.yml.
+#
+- name: Populate dynamic inventory from variables
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Validate ci_runners is a non-empty list
+      ansible.builtin.assert:
+        that:
+          - ci_runners is sequence
+          - ci_runners is not string
+          - (ci_runners | length) > 0
+          - ci_runners | map(attribute='name') | list | length > 0
+        fail_msg: >-
+          'ci_runners' must be a non-empty list of objects with at
+          least a 'name' and 'registration_token' field.
+          Example:
+            ci_runners:
+              - name: gitlab-ci-admin
+                gitlab_url: https://gitlab.com
+                registration_token: glrt-XXXX
+      tags: [always, inventory]
+
+    - name: Add runner admin AppVMs to inventory
+      ansible.builtin.add_host:
+        name: "{{ item.name }}"
+        groups: runner_admins
+        ansible_connection: qubes
+      loop: "{{ ci_runners | selectattr('executor', 'equalto', 'qubesos') | list }}"
+      loop_control:
+        label: "{{ item.name }}"
+      tags: [always, inventory]
+
+    - name: Add CI DVM to inventory
+      ansible.builtin.add_host:
+        name: "{{ ci_dvm_name }}"
+        groups: ci_dvms
+        ansible_connection: qubes
+      tags: [always, inventory, dvm]
+
+    - name: Add per-runner CI DVMs to inventory
+      ansible.builtin.add_host:
+        name: "{{ item.dvm_name }}"
+        groups: ci_dvms
+        ansible_connection: qubes
+      loop: "{{ ci_runners | selectattr('executor', 'equalto', 'qubesos') | selectattr('dvm_name', 'defined') | list }}"
+      loop_control:
+        label: "{{ item.dvm_name }}"
+      tags: [always, inventory, dvm]
+
+    - name: Add builder DVM to inventory
+      ansible.builtin.add_host:
+        name: "{{ builder_dvm_name }}"
+        groups: ci_dvms
+        ansible_connection: qubes
+      when: builder_dvm_name | default('') | length > 0
+      tags: [always, inventory, dvm]
+
+    - name: Add CI executor template to inventory
+      ansible.builtin.add_host:
+        name: "{{ ci_executor_template }}"
+        groups: ci_executor_templates
+        ansible_connection: qubes
+      tags: [inventory, template]
+
+    - name: Add runner admin template to inventory
+      ansible.builtin.add_host:
+        name: "{{ runner_admin_template }}"
+        groups: runner_admin_templates
+        ansible_connection: qubes
+      tags: [inventory, template]
+
+#
+# Create qubes and install RPC policies (dom0).
+#
+- name: Create CI runner qubes and install RPC policies (dom0)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+  roles:
+    - qubesos-dom0
+
+#
+# Set up runner admin template (openssh-server + sshd qubes-service drop-in).
+# Shut down AppVMs first so they restart from the updated template.
+#
+
+- name: Shut down runner admin AppVMs (pre-template-update)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+  tags: [template]
+  tasks:
+    - name: Shut down runner admin AppVMs
+      qubesos:
+        guest: "{{ item.name }}"
+        state: shutdown
+        wait: true
+      loop: "{{ ci_runners | selectattr('executor', 'equalto', 'qubesos') | list }}"
+      loop_control:
+        label: "{{ item.name }}"
+      ignore_errors: true
+
+- name: Shut down runner admin template (pre-setup)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+  tags: [template]
+  roles:
+    - role: qubesos-shutdown
+      vars:
+        shutdown_guest: "{{ runner_admin_template }}"
+
+- name: Install packages into runner admin template
+  hosts: runner_admin_templates
+  connection: qubes
+  gather_facts: false
+  remote_user: root
+  tags: [template]
+  roles:
+    - qubesos-admin-template
+
+- name: Shut down runner admin template (post-setup)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+  tags: [template]
+  roles:
+    - role: qubesos-shutdown
+      vars:
+        shutdown_guest: "{{ runner_admin_template }}"
+
+#
+# Set up executor template (docker, gitlab-runner, qubes-builderv2 deps).
+#
+
+- name: Shut down CI DVM (pre-template-update)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+  tags: [template]
+  roles:
+    - role: qubesos-shutdown
+      vars:
+        shutdown_guest: "{{ ci_dvm_name }}"
+
+- name: Shut down CI executor template (pre-setup)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+  tags: [template]
+  roles:
+    - role: qubesos-shutdown
+      vars:
+        shutdown_guest: "{{ ci_executor_template }}"
+
+- name: Install packages into CI executor template
+  hosts: ci_executor_templates
+  connection: qubes
+  gather_facts: false
+  remote_user: root
+  tags: [template]
+  roles:
+    - qubesos-executor-template
+
+- name: Shut down CI executor template (post-setup)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+  tags: [template]
+  roles:
+    - role: qubesos-shutdown
+      vars:
+        shutdown_guest: "{{ ci_executor_template }}"
+
+#
+# Configure CI DVMs (bind-dirs, RPC scripts for QubesExecutor).
+#
+- name: Configure CI DVM (gitlab-qubesos-dvm)
+  hosts: ci_dvms
+  connection: qubes
+  gather_facts: false
+  remote_user: root
+  tags: [dvm]
+  roles:
+    - qubesos-dvm
+
+- name: Shut down CI DVMs (post-setup)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: true
+  tags: [dvm]
+  tasks:
+    - name: Shut down CI DVMs
+      qubesos:
+        guest: "{{ item }}"
+        state: shutdown
+        wait: true
+      loop: >-
+        {{ [ci_dvm_name] +
+           (ci_runners | selectattr('executor', 'equalto', 'qubesos')
+                       | selectattr('dvm_name', 'defined')
+                       | map(attribute='dvm_name') | list) +
+           ([builder_dvm_name] if builder_dvm_name | default('') | length > 0 else []) }}
+      ignore_errors: true
+
+#
+# Configure runner admin AppVMs.
+#
+- name: Configure runner admin AppVMs
+  hosts: runner_admins
+  connection: qubes
+  gather_facts: false
+  remote_user: root
+  vars:
+    # Override the group_vars default (/opt/...) since /home/user is
+    # naturally persistent on QubesOS AppVMs (no bind-dir needed).
+    qubes_g2g_ci_dest: /home/user/qubes-g2g-continuous-integration
+  tags: [runner]
+  roles:
+    - qubesos-admin

@@ -1,0 +1,4 @@
+---
+# Variables specific to the KVM runner (host-kvm SSH host).
+
+kvm_executor_scripts_dir: "{{ qubes_g2g_ci_dest }}/runner/kvm"

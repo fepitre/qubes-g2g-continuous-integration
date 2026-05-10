@@ -1,0 +1,16 @@
+---
+- name: Compute runners assigned to this host
+  ansible.builtin.set_fact:
+    _host_runners: "{{ ci_runners | selectattr('host', 'equalto', inventory_hostname) | list }}"
+    _host_config: "{{ ci_runner_hosts[inventory_hostname] | default({}) }}"
+
+- name: Render gitlab-runner config.toml
+  ansible.builtin.template:
+    src: "{{ gitlab_runner_config_template }}"
+    dest: "{{ gitlab_runner_config_toml }}"
+    owner: root
+    group: root
+    mode: "0600"
+    lstrip_blocks: true
+  become: true
+  notify: restart gitlab-runner
