@@ -62,6 +62,9 @@ shutdown_timeout = {{ _host_config.shutdown_timeout }}
 {% if runner.docker.shm_size is defined %}
     shm_size = {{ runner.docker.shm_size }}
 {% endif %}
+{% if runner.docker.security_opt is defined %}
+    security_opt = {{ runner.docker.security_opt | to_json }}
+{% endif %}
 {% elif runner.executor == 'kvm' %}
   executor = "custom"
   builds_dir = "{{ runner.builds_dir | default(gitlab_runner_builds_dir) }}"

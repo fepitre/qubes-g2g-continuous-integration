@@ -8,12 +8,7 @@
   register: _docker_version
   changed_when: false
   failed_when: _docker_version.rc != 0
-
-# TODO: loop device pre-allocation. Bleuet currently relies on a fixed set of
-# /dev/loopN devices passed through to the container plus cap_add=MKNOD. This
-# is hacky (devices must exist on the host before docker can pass them); a
-# better approach is needed (e.g. losetup-managed pool, dynamic allocation,
-# or a different sandboxing strategy).
+  become: true
 
 - name: Pre-pull docker images for runners
   ansible.builtin.command: "docker pull {{ item }}"
