@@ -231,15 +231,11 @@ generate_qubesos() {
         --mkdir /var/lib/qubes-service/ \
         --touch /var/lib/qubes-service/sshd \
         --copy-in "$SCRIPT_DIR/setup-dom0-net.sh:/usr/local/bin/" \
-        --copy-in "$SCRIPT_DIR/setup-direct-dom0-net.sh:/usr/local/bin/" \
         --chmod 0775:/usr/local/bin/setup-dom0-net.sh \
-        --chmod 0775:/usr/local/bin/setup-direct-dom0-net.sh \
         --mkdir /etc/systemd/system/sshd.service.d \
-        --copy-in "$SCRIPT_DIR/setup-direct-net.service:/etc/systemd/system/" \
         --copy-in "$SCRIPT_DIR/custom.conf:/etc/systemd/system/sshd.service.d/" \
         --run-command 'systemctl daemon-reload' \
         --run-command 'systemctl enable sshd' \
-        --run-command 'systemctl enable setup-direct-net.service' \
         --run-command 'rm -rf /etc/pki/rpm-gpg/gpgkey /etc/pki/rpm-gpg/runner-gitlab-runner-49F16C5CC3A0F81F.pub.gpg /etc/yum.repos.d/gitlab_runner.repo'
 }
 
