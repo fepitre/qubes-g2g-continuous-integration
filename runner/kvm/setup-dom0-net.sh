@@ -14,7 +14,7 @@ ip a a 10.137.99.1/24 dev $dev
 ip l s $dev up
 ip r a default dev $dev
 rm -f /etc/resolv.conf
-echo -e 'nameserver 10.139.1.1\nnameserver 10.139.1.2' > /etc/resolv.conf
+echo 'nameserver 9.9.9.9' > /etc/resolv.conf
 qvm-run -p --no-gui -u root sys-net systemctl stop qubes-firewall
 sleep 2
 
