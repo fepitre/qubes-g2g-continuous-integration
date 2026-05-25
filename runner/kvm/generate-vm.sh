@@ -313,7 +313,13 @@ case "$VM_TYPE" in
 esac
 
 # Fix ownership and permissions on the output image
-chown libvirt-qemu:kvm "$OUTPUT_IMAGE"
+# Debian/Ubuntu: libvirt-qemu:kvm; Fedora/RHEL: qemu:qemu
+if id -u libvirt-qemu >/dev/null 2>&1; then
+    QEMU_OWNER="libvirt-qemu:kvm"
+else
+    QEMU_OWNER="qemu:qemu"
+fi
+chown "$QEMU_OWNER" "$OUTPUT_IMAGE"
 chmod 660 "$OUTPUT_IMAGE"
 
 # Create versionless symlink if applicable (e.g. gitlab-runner-fedora.qcow2 -> gitlab-runner-fedora-42.qcow2)
