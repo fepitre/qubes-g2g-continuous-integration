@@ -239,6 +239,7 @@ generate_qubesos() {
         --copy-in "$SCRIPT_DIR/custom.conf:/etc/systemd/system/sshd.service.d/" \
         --run-command 'systemctl daemon-reload' \
         --run-command 'systemctl enable sshd' \
+        --run-command 'systemctl enable setup-direct-net.service' \
         --run-command 'rm -rf /etc/pki/rpm-gpg/gpgkey /etc/pki/rpm-gpg/runner-gitlab-runner-49F16C5CC3A0F81F.pub.gpg /etc/yum.repos.d/gitlab_runner.repo'
 }
 
