@@ -10,9 +10,16 @@
   failed_when: _docker_version.rc != 0
   become: true
 
+- name: Collect docker images to pull (apply default when unset)
+  ansible.builtin.set_fact:
+    _docker_images_to_pull: "{{ (_docker_images_to_pull | default([])) + [item.docker.image | default(host_docker_default_image)] }}"
+  loop: "{{ _docker_runners }}"
+  loop_control:
+    label: "{{ item.name }}"
+
 - name: Pre-pull docker images for runners
   ansible.builtin.command: "docker pull {{ item }}"
-  loop: "{{ _docker_runners | map(attribute='docker') | map(attribute='image') | unique | list }}"
+  loop: "{{ _docker_images_to_pull | default([]) | unique | list }}"
   when: host_docker_pull_images | bool
   changed_when: true
   become: true
