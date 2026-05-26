@@ -156,6 +156,9 @@ generate_fedora() {
         --run-command "chmod 600 /etc/NetworkManager/system-connections/eth0.nmconnection" \
         --install "$packages" \
         --run-command "dnf update -y kernel kernel-devel" \
+        --run-command "dnf install -y --setopt=tsflags=noscripts gitlab-runner" \
+        --run-command "id gitlab-runner >/dev/null 2>&1 || useradd --comment 'GitLab Runner' --home /home/gitlab-runner -m --shell /bin/bash gitlab-runner" \
+        --run-command "systemctl enable gitlab-runner.service || true" \
         --run-command "git lfs install --skip-repo" \
         --ssh-inject "gitlab-runner:file:$ssh_pub_key" \
         --run-command "usermod -u 11000 gitlab-runner" \
