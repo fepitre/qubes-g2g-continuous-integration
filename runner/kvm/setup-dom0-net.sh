@@ -8,11 +8,18 @@ while ! qvm-start sys-net; do
 done
 
 xl network-attach 0 ip=10.137.99.1 script=/etc/xen/scripts/vif-route-qubes backend=sys-net
-sleep 2
-dev=$(ls /sys/class/net|sort|head -1)
-ip a a 10.137.99.1/24 dev $dev
-ip l s $dev up
-ip r a default dev $dev
+
+dev=
+for i in $(seq 1 30); do
+    dev=$(ls /sys/class/net | grep '^enX' | head -1)
+    [ -n "$dev" ] && break
+    sleep 1
+done
+[ -n "$dev" ] || { echo "no enX* device appeared after xl network-attach" >&2; exit 1; }
+
+ip a a 10.137.99.1/24 dev "$dev"
+ip l s "$dev" up
+ip r a default dev "$dev"
 
 printf 'nameserver 9.9.9.9\n' > /etc/resolv.conf
 
