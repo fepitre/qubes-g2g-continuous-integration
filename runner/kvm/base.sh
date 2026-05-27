@@ -47,8 +47,9 @@ _get_vm_ip() {
             | awk -v m="$mac" 'tolower($2)==tolower(m){print $4}' \
             | sed -E 's|/([0-9]+)?$||' \
             | head -1 || true)
-        [ -n "$ip" ] && { echo "$ip"; return; }
+        [ -n "$ip" ] && { echo "$ip"; return 0; }
     done
+    return 0
 }
 
 cleanup() {
