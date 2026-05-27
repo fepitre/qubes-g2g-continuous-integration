@@ -28,7 +28,27 @@ VM_IMAGE="$VM_IMAGES_PATH/$VM_ID.qcow2"
 VM_SSH_ARGS="-i $SSH_KEY -o StrictHostKeyChecking=no ${CUSTOM_ENV_VM_SSH_EXTRA_ARGS:-}"
 
 _get_vm_ip() {
-    virsh -q domifaddr "$VM_ID" 2>/dev/null | awk '{print $4}' | sed -E 's|/([0-9]+)?$||'
+    # Single-NIC guests (fedora/debian): use NIC1.
+    # Qubes guests: NIC1 -> sys-net (irrelevant for SSH), NIC2 -> PCI-
+    # passthrough'd to dom0 (sshd lives here), NIC3 -> unused spare.
+    # So always prefer NIC2 when present.
+    local n mac ip
+    n=$(virsh -q domiflist "$VM_ID" 2>/dev/null | awk '$5!=""' | wc -l || true)
+    [ -z "$n" ] && return
+    [ "$n" = 0 ] && return
+    if [ "$n" -ge 2 ]; then
+        mac=$(virsh -q domiflist "$VM_ID" 2>/dev/null | awk 'NR==2{print $5}' || true)
+    else
+        mac=$(virsh -q domiflist "$VM_ID" 2>/dev/null | awk 'NR==1{print $5}' || true)
+    fi
+    [ -z "$mac" ] && return
+    for src in lease arp agent; do
+        ip=$(virsh -q domifaddr "$VM_ID" --source "$src" 2>/dev/null \
+            | awk -v m="$mac" 'tolower($2)==tolower(m){print $4}' \
+            | sed -E 's|/([0-9]+)?$||' \
+            | head -1 || true)
+        [ -n "$ip" ] && { echo "$ip"; return; }
+    done
 }
 
 cleanup() {
