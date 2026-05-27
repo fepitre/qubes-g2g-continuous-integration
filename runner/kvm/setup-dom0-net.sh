@@ -3,7 +3,7 @@
 set -x
 set -e
 
-while ! qvm-start sys-net; do
+while ! qvm-start --skip-if-running sys-net; do
   sleep 1
 done
 
