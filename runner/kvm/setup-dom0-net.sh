@@ -7,14 +7,20 @@ while ! qvm-start --skip-if-running sys-net; do
   sleep 1
 done
 
-xl network-attach 0 ip=10.137.99.1 script=/etc/xen/scripts/vif-route-qubes backend=sys-net
-
-dev=
-for i in $(seq 1 30); do
-    dev=$(ls /sys/class/net | grep '^enX' | head -1)
-    [ -n "$dev" ] && break
+# sys-net's xendriverdomain must be active before xl network-attach,
+# otherwise the backend has no one to bind the new vif to.
+for i in $(seq 1 60); do
+    if qvm-run -p --no-gui -u root sys-net 'systemctl is-active --quiet xendriverdomain'; then
+        break
+    fi
+    [ "$i" = 60 ] && { echo "xendriverdomain did not become active in sys-net" >&2; exit 1; }
     sleep 1
 done
+
+xl network-attach 0 ip=10.137.99.1 script=/etc/xen/scripts/vif-route-qubes backend=sys-net
+udevadm settle
+
+dev=$(ls /sys/class/net | grep '^enX' | head -1)
 [ -n "$dev" ] || { echo "no enX* device appeared after xl network-attach" >&2; exit 1; }
 
 ip a a 10.137.99.1/24 dev "$dev"
