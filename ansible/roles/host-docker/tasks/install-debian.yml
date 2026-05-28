@@ -1,0 +1,46 @@
+---
+# Snap docker (canonical's docker snap) is unusable as a gitlab-runner
+# backend: its AppArmor profile denies reading /proc/*/mountinfo, so
+# runc cannot reconcile mount state and container start fails with
+# "mount: ... none already mounted or mount point busy".
+
+- name: Detect snap docker
+  ansible.builtin.stat:
+    path: /snap/bin/docker
+  register: _snap_docker
+
+- name: Remove snap docker
+  when: _snap_docker.stat.exists
+  block:
+    - name: Stop snap docker
+      ansible.builtin.command: snap stop docker
+      changed_when: true
+
+    - name: Remove snap docker package
+      ansible.builtin.command: snap remove --purge docker
+      changed_when: true
+  become: true
+
+- name: Install docker.io from apt
+  ansible.builtin.apt:
+    name: docker.io
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  become: true
+  notify: Restart gitlab-runner
+
+- name: Ensure docker service is enabled and running
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+  become: true
+
+- name: Add gitlab-runner user to docker group
+  ansible.builtin.user:
+    name: gitlab-runner
+    groups: docker
+    append: true
+  become: true
+  notify: Restart gitlab-runner

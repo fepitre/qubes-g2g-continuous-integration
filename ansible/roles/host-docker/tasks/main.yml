@@ -3,6 +3,10 @@
   ansible.builtin.set_fact:
     _docker_runners: "{{ ci_runners | selectattr('host', 'equalto', inventory_hostname) | selectattr('executor', 'equalto', 'docker') | list }}"
 
+- name: Install docker on Debian-family hosts
+  ansible.builtin.include_tasks: install-debian.yml
+  when: ansible_os_family == 'Debian'
+
 - name: Check docker binary is present
   ansible.builtin.command: docker version --format '{% raw %}{{.Server.Version}}{% endraw %}'
   register: _docker_version
