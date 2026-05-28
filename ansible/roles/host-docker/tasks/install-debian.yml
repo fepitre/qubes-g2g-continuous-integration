@@ -44,3 +44,32 @@
     append: true
   become: true
   notify: Restart gitlab-runner
+
+# docker-default denies the mount syscall, which breaks CI jobs that
+# mount tmpfs inside the container. Switching to apparmor=unconfined is
+# not an option: privileged=true + unconfined breaks sudo via
+# unix_chkpwd. Ship a custom profile (docker-default + mount allowed)
+# and let runners opt in via security_opt: [apparmor=docker-default-mount].
+- name: Install apparmor userspace
+  ansible.builtin.apt:
+    name:
+      - apparmor
+      - apparmor-utils
+    state: present
+  become: true
+
+- name: Install docker-default-mount apparmor profile
+  ansible.builtin.copy:
+    src: docker-default-mount
+    dest: /etc/apparmor.d/docker-default-mount
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  register: _aa_profile
+
+- name: Load docker-default-mount apparmor profile
+  ansible.builtin.command: apparmor_parser -r -W /etc/apparmor.d/docker-default-mount
+  become: true
+  when: _aa_profile.changed
+  changed_when: true

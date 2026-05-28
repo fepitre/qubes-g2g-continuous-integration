@@ -1,0 +1,50 @@
+#include <tunables/global>
+
+# Variant of docker's auto-generated docker-default profile (rendered
+# from moby's apparmor template) with `deny mount,` replaced by
+# `mount,`. Needed for CI jobs that mount tmpfs inside the container
+# (e.g. qubes-core-admin-client backup tests). Switching to
+# apparmor=unconfined is not an option: privileged=true + unconfined
+# breaks sudo via unix_chkpwd. Opt in via
+# security_opt: [apparmor=docker-default-mount].
+
+profile docker-default-mount flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+
+  network,
+  capability,
+  file,
+  umount,
+  # Host (privileged) processes may send signals to container processes.
+  signal (receive) peer=unconfined,
+  # runc may send signals to container processes (for "docker stop").
+  signal (receive) peer=runc,
+  # crun may send signals to container processes (for "docker stop" when used with crun OCI runtime).
+  signal (receive) peer=crun,
+  # dockerd may send signals to container processes (for "docker kill").
+  signal (receive) peer=unconfined,
+  # Container processes may send signals amongst themselves.
+  signal (send,receive) peer=docker-default-mount,
+
+  deny @{PROC}/* w,   # deny write for all files directly in /proc (not in a subdir)
+  # deny write to files not in /proc/<number>/** or /proc/sys/**
+  deny @{PROC}/{[^1-9],[^1-9][^0-9],[^1-9s][^0-9y][^0-9s],[^1-9][^0-9][^0-9][^0-9/]*}/** w,
+  deny @{PROC}/sys/[^k]** w,  # deny /proc/sys except /proc/sys/k* (effectively /proc/sys/kernel)
+  deny @{PROC}/sys/kernel/{?,??,[^s][^h][^m]**} w,  # deny everything except shm* in /proc/sys/kernel/
+  deny @{PROC}/sysrq-trigger rwklx,
+  deny @{PROC}/kcore rwklx,
+
+  mount,
+
+  deny /sys/[^f]*/** wklx,
+  deny /sys/f[^s]*/** wklx,
+  deny /sys/fs/[^c]*/** wklx,
+  deny /sys/fs/c[^g]*/** wklx,
+  deny /sys/fs/cg[^r]*/** wklx,
+  deny /sys/firmware/** rwklx,
+  deny /sys/devices/virtual/powercap/** rwklx,
+  deny /sys/kernel/security/** rwklx,
+
+  # suppress ptrace denials when using 'docker ps' or using 'ps' inside a container
+  ptrace (trace,read,tracedby,readby) peer=docker-default-mount,
+}
