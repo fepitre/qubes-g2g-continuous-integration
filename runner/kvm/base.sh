@@ -8,8 +8,65 @@ set -eo pipefail
 
 VM_IMAGES_PATH="/var/lib/libvirt/images"
 
-if [ -n "${CUSTOM_ENV_VM_IMAGE:-}" ] && [ -e "$VM_IMAGES_PATH/${CUSTOM_ENV_VM_IMAGE}" ]; then
-    BASE_VM_IMAGE="$VM_IMAGES_PATH/${CUSTOM_ENV_VM_IMAGE}"
+# Translate a docker-style image reference (fedora:42, qubesos:4.3,
+# qubesos:4.3-debian, debian, ...) into the on-disk qcow2 filename
+# produced by generate-vm.sh. Empty tag means the versionless symlink
+# (which itself points at the highest version on disk). Returns 1 on
+# unknown distro so the caller can fall back to literal filename
+# matching for backward compatibility.
+resolve_vm_image() {
+    local ref="$1" distro tag version flavor
+    if [[ "$ref" == *:* ]]; then
+        distro="${ref%%:*}"
+        tag="${ref#*:}"
+    else
+        distro="$ref"
+        tag=""
+    fi
+    case "$distro" in
+        fedora|debian)
+            if [ -n "$tag" ]; then
+                echo "gitlab-runner-${distro}-${tag}.qcow2"
+            else
+                echo "gitlab-runner-${distro}.qcow2"
+            fi
+            ;;
+        qubesos)
+            # tag forms: "" | "4.3" | "debian" | "4.3-debian"
+            if [[ "$tag" == *-* ]]; then
+                version="${tag%-*}"
+                flavor="${tag##*-}"
+            elif [[ "$tag" =~ ^[0-9] ]]; then
+                version="$tag"
+                flavor=""
+            else
+                version=""
+                flavor="$tag"
+            fi
+            local prefix="qubes"
+            [ -n "$flavor" ] && prefix="qubes_${flavor}"
+            if [ -n "$version" ]; then
+                echo "${prefix}_${version}_64bit_stable.qcow2"
+            else
+                echo "${prefix}_64bit_stable.qcow2"
+            fi
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+if [ -n "${CUSTOM_ENV_VM_IMAGE:-}" ]; then
+    if resolved=$(resolve_vm_image "$CUSTOM_ENV_VM_IMAGE") \
+       && [ -e "$VM_IMAGES_PATH/$resolved" ]; then
+        BASE_VM_IMAGE="$VM_IMAGES_PATH/$resolved"
+    elif [ -e "$VM_IMAGES_PATH/$CUSTOM_ENV_VM_IMAGE" ]; then
+        BASE_VM_IMAGE="$VM_IMAGES_PATH/$CUSTOM_ENV_VM_IMAGE"
+    else
+        echo "VM_IMAGE '$CUSTOM_ENV_VM_IMAGE' not found (tried '${resolved:-}' and literal)." >&2
+        exit 1
+    fi
 else
     BASE_VM_IMAGE="$VM_IMAGES_PATH/gitlab-runner-fedora.qcow2"
 fi

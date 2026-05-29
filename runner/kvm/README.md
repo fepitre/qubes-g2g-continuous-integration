@@ -113,6 +113,42 @@ Output images and their versionless symlinks in `/var/lib/libvirt/images/`:
 | `qubesos` | `qubes_4.3_64bit_stable.qcow2` | `qubes_64bit_stable.qcow2` |
 | `qubesos-debian` | `qubes_debian_4.3_64bit_stable.qcow2` | `qubes_debian_64bit_stable.qcow2` |
 
+## Selecting a base image in a CI job
+
+The `kvm` runner reads the `VM_IMAGE` job variable. Two forms are accepted:
+
+1. **Docker-style reference** (preferred):
+
+   ```yaml
+   variables:
+     VM_IMAGE: fedora:42
+   ```
+
+   Supported refs:
+
+   | Reference | Resolved file |
+   |-----------|---------------|
+   | `fedora` | `gitlab-runner-fedora.qcow2` (highest version symlink) |
+   | `fedora:42` | `gitlab-runner-fedora-42.qcow2` |
+   | `debian` | `gitlab-runner-debian.qcow2` (highest version symlink) |
+   | `debian:13` | `gitlab-runner-debian-13.qcow2` |
+   | `qubesos` | `qubes_64bit_stable.qcow2` (highest version symlink) |
+   | `qubesos:4.3` | `qubes_4.3_64bit_stable.qcow2` |
+   | `qubesos:debian` | `qubes_debian_64bit_stable.qcow2` |
+   | `qubesos:4.3-debian` | `qubes_debian_4.3_64bit_stable.qcow2` |
+
+2. **Literal filename** (backward compatible):
+
+   ```yaml
+   variables:
+     VM_IMAGE: qubes_4.3_64bit_stable.qcow2
+   ```
+
+If `VM_IMAGE` is unset, the runner defaults to `gitlab-runner-fedora.qcow2`.
+If the requested image does not exist on the runner host, the job fails.
+
+## generate-vm.sh wrapper
+
 The wrapper:
 - Makes `/boot/vmlinuz-*` readable for `supermin` (required on Debian/Ubuntu)
 - Ensures the `libvirt` group has write access to `/var/lib/libvirt/images/`
