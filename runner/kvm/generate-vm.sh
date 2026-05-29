@@ -251,6 +251,7 @@ case "$VM_TYPE" in
         VERSION="${2:-42}"
         OUTPUT_IMAGE="$VM_IMAGES_PATH/gitlab-runner-fedora-${VERSION}.qcow2"
         SYMLINK="$VM_IMAGES_PATH/gitlab-runner-fedora.qcow2"
+        VERSION_GLOB="gitlab-runner-fedora-*.qcow2"
         sudo -u gitlab-runner bash -c "
             $LIBGUESTFS_EXTRA_VARS
             SCRIPT_DIR='$SCRIPT_DIR'
@@ -263,6 +264,7 @@ case "$VM_TYPE" in
         VERSION="${2:-13}"
         OUTPUT_IMAGE="$VM_IMAGES_PATH/gitlab-runner-debian-${VERSION}.qcow2"
         SYMLINK="$VM_IMAGES_PATH/gitlab-runner-debian.qcow2"
+        VERSION_GLOB="gitlab-runner-debian-*.qcow2"
         sudo -u gitlab-runner bash -c "
             $LIBGUESTFS_EXTRA_VARS
             SCRIPT_DIR='$SCRIPT_DIR'
@@ -275,6 +277,7 @@ case "$VM_TYPE" in
         VERSION="${2:-4.3}"
         OUTPUT_IMAGE="${3:-}"
         SYMLINK="$VM_IMAGES_PATH/qubes_64bit_stable.qcow2"
+        VERSION_GLOB="qubes_*_64bit_stable.qcow2"
         if [ -z "$OUTPUT_IMAGE" ]; then
             OUTPUT_IMAGE="$VM_IMAGES_PATH/qubes_${VERSION}_64bit_stable.qcow2"
             download_openqa_image "install_unencrypted_full_upload" "$VERSION" "$OUTPUT_IMAGE"
@@ -292,6 +295,7 @@ case "$VM_TYPE" in
         VERSION="${2:-4.3}"
         OUTPUT_IMAGE="${3:-}"
         SYMLINK="$VM_IMAGES_PATH/qubes_debian_64bit_stable.qcow2"
+        VERSION_GLOB="qubes_debian_*_64bit_stable.qcow2"
         if [ -z "$OUTPUT_IMAGE" ]; then
             OUTPUT_IMAGE="$VM_IMAGES_PATH/qubes_debian_${VERSION}_64bit_stable.qcow2"
             download_openqa_image "install_unencrypted_debian_upload" "$VERSION" "$OUTPUT_IMAGE"
@@ -321,10 +325,16 @@ fi
 chown "$QEMU_OWNER" "$OUTPUT_IMAGE"
 chmod 660 "$OUTPUT_IMAGE"
 
-# Create versionless symlink if applicable (e.g. gitlab-runner-fedora.qcow2 -> gitlab-runner-fedora-42.qcow2)
-if [ -n "${SYMLINK:-}" ]; then
-    ln -sf "$(basename "$OUTPUT_IMAGE")" "$SYMLINK"
-    echo "Symlink: $SYMLINK -> $(basename "$OUTPUT_IMAGE")"
+# Symlink points at the highest version on disk, so building
+# an older version side by side with a newer one does not regress the
+# symlink (e.g. building fedora 41 next to fedora 42 leaves the symlink
+# on 42).
+if [ -n "${SYMLINK:-}" ] && [ -n "${VERSION_GLOB:-}" ]; then
+    latest=$(find "$VM_IMAGES_PATH" -maxdepth 1 -name "$VERSION_GLOB" ! -type l -printf '%f\n' \
+        | sort -V | tail -1)
+    if [ -n "$latest" ]; then
+        ln -sf "$latest" "$SYMLINK"
+    fi
 fi
 
 echo "Done: $OUTPUT_IMAGE"
