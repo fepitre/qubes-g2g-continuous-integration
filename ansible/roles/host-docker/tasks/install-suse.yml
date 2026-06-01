@@ -1,0 +1,46 @@
+---
+- name: Install docker from zypper
+  community.general.zypper:
+    name: docker
+    state: present
+  become: true
+  notify: Restart gitlab-runner
+
+- name: Ensure docker service is enabled and running
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+  become: true
+
+- name: Add gitlab-runner user to docker group
+  ansible.builtin.user:
+    name: gitlab-runner
+    groups: docker
+    append: true
+  become: true
+  notify: Restart gitlab-runner
+
+- name: Install apparmor userspace
+  community.general.zypper:
+    name:
+      - apparmor-parser
+      - apparmor-utils
+    state: present
+  become: true
+
+- name: Install docker-default-mount apparmor profile
+  ansible.builtin.copy:
+    src: docker-default-mount
+    dest: /etc/apparmor.d/docker-default-mount
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  register: _aa_profile
+
+- name: Load docker-default-mount apparmor profile
+  ansible.builtin.command: /usr/sbin/apparmor_parser -r -W /etc/apparmor.d/docker-default-mount
+  become: true
+  when: _aa_profile.changed
+  changed_when: true

@@ -7,6 +7,10 @@
   ansible.builtin.include_tasks: install-debian.yml
   when: ansible_os_family == 'Debian'
 
+- name: Install docker on SUSE-family hosts
+  ansible.builtin.include_tasks: install-suse.yml
+  when: ansible_os_family == 'Suse'
+
 - name: Check docker binary is present
   ansible.builtin.command: docker version --format '{% raw %}{{.Server.Version}}{% endraw %}'
   register: _docker_version
