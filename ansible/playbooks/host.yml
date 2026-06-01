@@ -43,6 +43,42 @@
         _host_has_docker: "{{ (ci_runners | selectattr('host', 'equalto', inventory_hostname) | selectattr('executor', 'equalto', 'docker') | list | length) > 0 }}"
         _host_has_kvm: "{{ (ci_runners | selectattr('host', 'equalto', inventory_hostname) | selectattr('executor', 'equalto', 'kvm') | list | length) > 0 }}"
 
+    - name: SUSE family bootstrap
+      when: ansible_os_family == 'Suse'
+      become: true
+      block:
+        - name: Ensure /etc/sudoers includes /etc/sudoers.d
+          ansible.builtin.lineinfile:
+            path: /etc/sudoers
+            line: "@includedir /etc/sudoers.d"
+            state: present
+            validate: /usr/sbin/visudo -cf %s
+
+        - name: Sane sudoers defaults (disable targetpw, NOPASSWD wheel)
+          ansible.builtin.copy:
+            dest: /etc/sudoers.d/00-local
+            content: |
+              Defaults !targetpw
+              root ALL=(ALL:ALL) ALL
+              %wheel ALL=(ALL:ALL) NOPASSWD: ALL
+            owner: root
+            group: root
+            mode: "0440"
+            validate: /usr/sbin/visudo -cf %s
+
+        - name: Add GitLab Runner zypper repo
+          community.general.zypper_repository:
+            name: runner_gitlab-runner
+            repo: https://packages.gitlab.com/runner/gitlab-runner/opensuse/42.3/$basearch
+            auto_import_keys: true
+            autorefresh: true
+            state: present
+
+        - name: Install gitlab-runner package
+          community.general.zypper:
+            name: gitlab-runner
+            state: present
+
     - name: Set up docker executor
       ansible.builtin.include_role:
         name: host-docker
