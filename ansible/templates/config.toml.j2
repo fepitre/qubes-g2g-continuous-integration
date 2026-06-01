@@ -100,6 +100,18 @@ shutdown_timeout = {{ _host_config.shutdown_timeout }}
     prepare_exec = "{{ qubesos_executor_scripts_dir }}/prepare.sh"
     run_exec = "{{ qubesos_executor_scripts_dir }}/run.sh"
     cleanup_exec = "{{ qubesos_executor_scripts_dir }}/cleanup.sh"
+{% elif runner.executor == 'shell' %}
+  executor = "shell"
+{% if runner.shell is defined %}
+  shell = "{{ runner.shell }}"
+{% endif %}
+  [runners.cache]
+{% if runner.cache_max_upload_size is defined %}
+    MaxUploadedArchiveSize = {{ runner.cache_max_upload_size }}
+{% endif %}
+    [runners.cache.s3]
+    [runners.cache.gcs]
+    [runners.cache.azure]
 {% endif %}
 {% endfor %}
 {% endfor %}

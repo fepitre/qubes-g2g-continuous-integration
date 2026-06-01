@@ -42,6 +42,7 @@
       ansible.builtin.set_fact:
         _host_has_docker: "{{ (ci_runners | selectattr('host', 'equalto', inventory_hostname) | selectattr('executor', 'equalto', 'docker') | list | length) > 0 }}"
         _host_has_kvm: "{{ (ci_runners | selectattr('host', 'equalto', inventory_hostname) | selectattr('executor', 'equalto', 'kvm') | list | length) > 0 }}"
+        _host_has_shell: "{{ (ci_runners | selectattr('host', 'equalto', inventory_hostname) | selectattr('executor', 'equalto', 'shell') | list | length) > 0 }}"
 
     - name: SUSE family bootstrap
       when: ansible_os_family == 'Suse'
@@ -90,6 +91,18 @@
         name: host-kvm
       when: _host_has_kvm
       tags: [kvm]
+
+    - name: Allow gitlab-runner passwordless sudo for shell jobs
+      ansible.builtin.copy:
+        dest: /etc/sudoers.d/gitlab-runner
+        content: "gitlab-runner ALL=(ALL) NOPASSWD:ALL\n"
+        owner: root
+        group: root
+        mode: "0440"
+        validate: /usr/sbin/visudo -cf %s
+      become: true
+      when: _host_has_shell
+      tags: [shell]
 
     - name: Render gitlab-runner config.toml
       ansible.builtin.include_role:
