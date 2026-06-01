@@ -52,6 +52,7 @@ host_kvm_packages_suse:
   - libosinfo
   - dhcp-client
   - xfsprogs
+  - libguestfs-xfs
 
 # Where libvirt stores VM disk images. gitlab-runner needs group write
 # access here (via the libvirt group) to drop generated VM images.
