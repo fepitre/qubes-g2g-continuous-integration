@@ -23,12 +23,19 @@
     mode: "0755"
   become: true
 
-- name: Configure docker to use the nftables firewall backend
+- name: Configure docker (nftables backend, logging, selinux)
   ansible.builtin.copy:
     dest: /etc/docker/daemon.json
     content: |
       {
-        "firewall-backend": "nftables"
+        "firewall-backend": "nftables",
+        "log-level": "warn",
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "10m",
+          "max-file": "5"
+        },
+        "selinux-enabled": true
       }
     owner: root
     group: root
