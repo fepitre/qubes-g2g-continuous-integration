@@ -6,6 +6,36 @@
   become: true
   notify: Restart gitlab-runner
 
+# docker (>=27 on openSUSE Tumbleweed) defaults to the iptables-legacy
+# firewall backend and installs FORWARD policy=DROP plus DOCKER-USER /
+# DOCKER-FORWARD chains. Non-docker forwarded traffic (libvirt virbr0 ->
+# uplink for VM NAT) falls through both docker chains and hits the
+# legacy DROP, which is terminal even though firewalld already uses
+# nftables. Switching docker to the nftables backend makes it install
+# its rules in the same subsystem firewalld uses, so libvirt's own
+# guest_nat NAT path is no longer shadowed by an invisible legacy DROP.
+- name: Ensure /etc/docker exists
+  ansible.builtin.file:
+    path: /etc/docker
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: Configure docker to use the nftables firewall backend
+  ansible.builtin.copy:
+    dest: /etc/docker/daemon.json
+    content: |
+      {
+        "firewall-backend": "nftables"
+      }
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify: Restart docker
+
 - name: Ensure docker service is enabled and running
   ansible.builtin.service:
     name: docker
