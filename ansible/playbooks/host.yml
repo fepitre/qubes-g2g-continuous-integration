@@ -17,6 +17,7 @@
           - ci_runners is sequence
           - ci_runners is not string
         fail_msg: "ci_runners must be a list (see ansible/group_vars/all.yml)"
+      tags: always
 
     - name: Add SSH-managed runner hosts to dynamic group
       ansible.builtin.add_host:
@@ -25,6 +26,7 @@
       loop: "{{ ci_runners | rejectattr('executor', 'equalto', 'qubesos') | map(attribute='host') | unique | list }}"
       loop_control:
         label: "{{ item }}"
+      tags: always
 
 - name: Configure runner hosts
   hosts: ssh_runner_hosts
@@ -43,10 +45,12 @@
         _host_has_docker: "{{ (ci_runners | selectattr('host', 'equalto', inventory_hostname) | selectattr('executor', 'equalto', 'docker') | list | length) > 0 }}"
         _host_has_kvm: "{{ (ci_runners | selectattr('host', 'equalto', inventory_hostname) | selectattr('executor', 'equalto', 'kvm') | list | length) > 0 }}"
         _host_has_shell: "{{ (ci_runners | selectattr('host', 'equalto', inventory_hostname) | selectattr('executor', 'equalto', 'shell') | list | length) > 0 }}"
+      tags: always
 
     - name: SUSE family bootstrap
       when: ansible_os_family == 'Suse'
       become: true
+      tags: always
       block:
         - name: Ensure /etc/sudoers includes /etc/sudoers.d
           ansible.builtin.lineinfile:
@@ -79,6 +83,30 @@
           community.general.zypper:
             name: gitlab-runner
             state: present
+
+    - name: Keep NetworkManager out of libvirt and docker bridges
+      # NM auto-adopts virbr* and docker* otherwise: when libvirt restarts
+      # its default net, NM keeps the bridge interface alive and libvirt
+      # then fails with "File exists" because virbr0 is still up.
+      ansible.builtin.copy:
+        dest: /etc/NetworkManager/conf.d/90-libvirt-docker-unmanaged.conf
+        content: |
+          [keyfile]
+          unmanaged-devices=interface-name:virbr*;interface-name:vnet*;interface-name:docker*;interface-name:br-*
+        owner: root
+        group: root
+        mode: "0644"
+      become: true
+      register: _nm_unmanaged
+      tags: always
+
+    - name: Reload NetworkManager so unmanaged-devices applies
+      ansible.builtin.systemd:
+        name: NetworkManager
+        state: reloaded
+      become: true
+      when: _nm_unmanaged.changed
+      tags: always
 
     - name: Set up docker executor
       ansible.builtin.include_role:
