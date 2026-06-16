@@ -43,6 +43,13 @@
     group: root
     mode: "0755"
 
+- name: Ensure rc.local starts with a shebang
+  ansible.builtin.lineinfile:
+    path: "{{ rc_local_path }}"
+    line: "#!/bin/sh"
+    insertbefore: BOF
+    state: present
+
 - name: Create gitlab-runner persistent config directory
   ansible.builtin.file:
     path: /rw/config/gitlab-runner
@@ -222,12 +229,21 @@
     mode: "0644"
   notify: reload systemd
 
-- name: Enable and start gitlab-runner service
+# /etc is volatile on QubesOS AppVMs, so a systemctl enable symlink there does
+# not survive a reboot. Start now, and persist autostart via rc.local below.
+- name: Start gitlab-runner service now
   ansible.builtin.systemd:
     name: gitlab-runner
-    enabled: true
     state: started
     daemon_reload: true
+
+- name: Persist gitlab-runner autostart across AppVM reboots via rc.local
+  ansible.builtin.blockinfile:
+    path: "{{ rc_local_path }}"
+    marker: "# {mark} ANSIBLE MANAGED - gitlab-runner autostart"
+    block: |
+      systemctl daemon-reload
+      systemctl start gitlab-runner.service
 
 - name: Ensure .ssh directory exists for runner user
   ansible.builtin.file:
