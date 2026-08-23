@@ -9,8 +9,8 @@ gitlab_runner_user: user
 gitlab_runner_workdir: /home/user
 
 # Template VMs
-ci_executor_template: fedora-42-xfce
-runner_admin_template: fedora-42-xfce
+ci_executor_template: fedora-44-xfce
+runner_admin_template: fedora-44-xfce
 
 # Disposable VM for CI job cages
 ci_dvm_name: gitlab-ci-dvm
