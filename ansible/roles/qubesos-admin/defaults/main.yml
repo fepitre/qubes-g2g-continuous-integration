@@ -9,6 +9,9 @@ runner_admin_bind_dirs:
   - /home/user/cache
 
 runner_admin_config_toml: /rw/config/gitlab-runner/config.toml
+
+# /etc is volatile on QubesOS AppVMs; keep the executor env file on /rw.
+runner_admin_env_file: /rw/config/gitlab-ci-runner.env
 systemd_unit_dir: /usr/local/lib/systemd/system
 
 # Role-local symlink to the shared ansible/templates/config.toml.j2. The

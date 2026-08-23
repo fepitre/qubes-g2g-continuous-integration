@@ -203,14 +203,23 @@
               -u "%{_gpg_name}" -sb %{__plaintext_filename} >%{__signature_filename}'
   when: _runner_item.gpg_vault is defined
 
-# env file read by executor scripts to get the DVM name for this runner
+# env file read by executor scripts to get the DVM name for this runner.
+# /etc is volatile on QubesOS AppVMs, so the real file lives in /rw/config and
+# is linked into /etc here and at every boot from rc.local below.
 - name: Write executor env file
   ansible.builtin.copy:
-    dest: /etc/gitlab-ci-runner.env
+    dest: "{{ runner_admin_env_file }}"
     owner: root
     group: root
     mode: "0644"
     content: "CI_RUNNER_DVM={{ _runner_item.dvm_name | default(ci_dvm_name) }}\n"
+
+- name: Link executor env file into /etc
+  ansible.builtin.file:
+    src: "{{ runner_admin_env_file }}"
+    dest: /etc/gitlab-ci-runner.env
+    state: link
+    force: true
 
 - name: Create systemd unit directory
   ansible.builtin.file:
@@ -242,6 +251,7 @@
     path: "{{ rc_local_path }}"
     marker: "# {mark} ANSIBLE MANAGED - gitlab-runner autostart"
     block: |
+      ln -sf {{ runner_admin_env_file }} /etc/gitlab-ci-runner.env
       systemctl daemon-reload
       systemctl start gitlab-runner.service
 
