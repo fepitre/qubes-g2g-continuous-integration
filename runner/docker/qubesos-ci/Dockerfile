@@ -17,7 +17,6 @@ RUN dnf -y install \
     grub2-tools \
     hunspell \
     jq \
-    jekyll \
     libxml2 \
     libxml2-devel \
     libxslt \
