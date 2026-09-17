@@ -3,6 +3,21 @@
   ansible.builtin.set_fact:
     _docker_runners: "{{ ci_runners | selectattr('host', 'equalto', inventory_hostname) | selectattr('executor', 'equalto', 'docker') | list }}"
 
+# dockerd aborts at startup when it cannot create its default bridge:
+# "IPv4 forwarding is disabled". openSUSE ships /etc/sysctl.d/70-yast.conf
+# with net.ipv4.ip_forward = 0, which wins over the kernel default, so the
+# override has to sort after it.
+- name: Enable IPv4 forwarding for the docker bridge
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    sysctl_file: /etc/sysctl.d/99-docker-forwarding.conf
+    sysctl_set: true
+    reload: true
+    state: present
+  become: true
+  notify: Restart docker
+
 - name: Install docker on Debian-family hosts
   ansible.builtin.include_tasks: install-debian.yml
   when: ansible_os_family == 'Debian'

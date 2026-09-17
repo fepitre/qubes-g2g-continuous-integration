@@ -1,7 +1,9 @@
 ---
 - name: Install docker from zypper
   community.general.zypper:
-    name: docker
+    name:
+      - docker
+      - docker-compose
     state: present
   become: true
   notify: Restart gitlab-runner
