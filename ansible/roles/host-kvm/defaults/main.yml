@@ -61,3 +61,7 @@ host_kvm_libvirt_images_dir: /var/lib/libvirt/images
 # Drop /etc/modprobe.d/kvm.conf with ignore_msrs=1 to silence guest
 # unsupported-MSR access (otherwise floods dmesg on some CPUs).
 host_kvm_ignore_msrs: true
+
+# Open http in the libvirt firewalld zone so build VMs can reach the local
+# package mirror on the bridge address. Ignored when firewalld is not running.
+host_kvm_allow_mirror_http: true

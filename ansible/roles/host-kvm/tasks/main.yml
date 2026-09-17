@@ -113,6 +113,28 @@
   changed_when: true
   become: true
 
+# Build VMs pull their packages from the local mirror on the host. The libvirt
+# zone ships with a catch-all reject after dhcp/dns/ssh/tftp, so without this
+# guests cannot reach nginx on the bridge address.
+- name: Check for a running firewalld
+  ansible.builtin.command: firewall-cmd --state
+  register: _firewalld_state
+  changed_when: false
+  failed_when: false
+  become: true
+
+- name: Allow guests to reach the local mirror over HTTP
+  ansible.posix.firewalld:
+    zone: libvirt
+    service: http
+    permanent: true
+    immediate: true
+    state: enabled
+  when:
+    - host_kvm_allow_mirror_http | bool
+    - _firewalld_state.rc == 0
+  become: true
+
 - name: Ensure gitlab-runner .ssh directory exists
   ansible.builtin.file:
     path: "/home/{{ gitlab_runner_user }}/.ssh"
@@ -140,5 +162,7 @@
 # minutes. Run manually when adding a new template kind:
 #   sudo {{ kvm_executor_scripts_dir }}/generate-vm.sh fedora
 #   sudo {{ kvm_executor_scripts_dir }}/generate-vm.sh debian
-#   sudo {{ kvm_executor_scripts_dir }}/generate-vm.sh qubesos
-# See runner/kvm/README.md for the full list of kinds.
+#   sudo {{ kvm_executor_scripts_dir }}/generate-vm.sh \
+#     --mirror http://192.168.122.1/pub qubesos
+# See runner/kvm/README.md for the full list of kinds. --mirror points dom0 at
+# the local mirror; leave it out on hosts that do not run one.

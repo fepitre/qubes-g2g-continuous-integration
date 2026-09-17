@@ -102,7 +102,29 @@ sudo ./generate-vm.sh qubesos-debian 4.3 /var/lib/libvirt/images/my-qubes-debian
 
 # Enable verbose libguestfs output
 sudo ./generate-vm.sh --debug fedora
+
+# Point dom0 at the local package mirror instead of the public metalinks
+sudo ./generate-vm.sh --mirror http://192.168.122.1/pub qubesos
 ```
+
+### `--mirror` (qubesos images)
+
+dom0 tracks an old Fedora (fc41 for r4.3). Once that release goes EOL its
+metalink only returns archive mirrors, six hosts against roughly 130 for a live
+release, and jobs that run `qubes-dom0-update` fail there several times a run
+with TLS handshake errors, connections dropped mid-transfer, HTTP 400, and
+truncated zchunk metadata. VM templates are unaffected because they track a
+current Fedora.
+
+`--mirror` rewrites dom0's `fedora`, `updates` and `qubes-dom0-current*` repos
+to a `baseurl` under the given mirror, which the `mirror-sync` role already
+populates with both the Fedora archive and the Qubes dom0 repos. Packages stay
+GPG-checked; only the location changes. `192.168.122.1` is the libvirt `default`
+bridge, so guests reach the mirror on the host without leaving the machine. The
+host needs `http` open in the libvirt firewalld zone, which the `host-kvm` role
+does.
+
+Leave the flag off on hosts that do not run a mirror.
 
 Output images and their versionless symlinks in `/var/lib/libvirt/images/`:
 

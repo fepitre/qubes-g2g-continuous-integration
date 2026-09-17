@@ -11,21 +11,40 @@ OPENQA_BASE_URL="https://openqa.qubes-os.org"
 OPENQA_API="$OPENQA_BASE_URL/api/v1"
 LIBGUESTFS_EXTRA_VARS=""
 
+# Base URL of a local package mirror (nginx serving /pub), from --mirror or
+# the environment. When set, dom0's Fedora and Qubes repos are pointed at it
+# instead of the public metalinks; see set-dom0-mirror.sh for why. Empty keeps
+# the stock repo config.
+CI_MIRROR_BASE="${CI_MIRROR_BASE:-}"
+
 #
 # Argument parsing
 #
 
-# Optional --debug flag (must be first argument)
-if [ "${1:-}" = "--debug" ]; then
-    LIBGUESTFS_EXTRA_VARS="export LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1"
-    shift
-else
-    LIBGUESTFS_EXTRA_VARS=""
-fi
+# Optional flags, before the positional arguments
+while true; do
+    case "${1:-}" in
+        --debug)
+            LIBGUESTFS_EXTRA_VARS="export LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1"
+            shift
+            ;;
+        --mirror)
+            CI_MIRROR_BASE="${2:-}"
+            if [ -z "$CI_MIRROR_BASE" ]; then
+                echo "--mirror needs a base URL, e.g. --mirror http://192.168.122.1/pub"
+                exit 1
+            fi
+            shift 2
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
 
 VM_TYPE="${1:-}"
 if [ -z "$VM_TYPE" ]; then
-    echo "Usage: $0 [--debug] <fedora|debian|qubesos|qubesos-debian> [version] [/var/lib/libvirt/images/image.qcow2]"
+    echo "Usage: $0 [--debug] [--mirror URL] <fedora|debian|qubesos|qubesos-debian> [version] [/var/lib/libvirt/images/image.qcow2]"
     exit 1
 fi
 
@@ -217,6 +236,7 @@ generate_debian() {
 generate_qubesos() {
     local qubes_image="$1"
     local ssh_pub_key="$2"
+    local qubes_release="${3:-4.3}"
 
     virt-customize -a "$qubes_image" \
         --run-command "sed -i 's|self.netdevs.extend(self.find_devices_of_class(vm, \"02\"))|self.netdevs.extend(sorted(self.find_devices_of_class(vm, \"02\"))[:1])|' /root/extra-files/qubesteststub/__init__.py" \
@@ -240,6 +260,14 @@ generate_qubesos() {
         --run-command 'systemctl enable sshd' \
         --run-command 'systemctl enable setup-direct-net.service' \
         --run-command 'rm -rf /etc/pki/rpm-gpg/gpgkey /etc/pki/rpm-gpg/runner-gitlab-runner-49F16C5CC3A0F81F.pub.gpg /etc/yum.repos.d/gitlab_runner.repo'
+
+    if [ -n "$CI_MIRROR_BASE" ]; then
+        virt-customize -a "$qubes_image" \
+            --copy-in "$SCRIPT_DIR/set-dom0-mirror.sh:/usr/local/bin/" \
+            --chmod 0755:/usr/local/bin/set-dom0-mirror.sh \
+            --run-command "/usr/local/bin/set-dom0-mirror.sh '$CI_MIRROR_BASE' '$qubes_release'" \
+            --run-command 'rm -f /usr/local/bin/set-dom0-mirror.sh'
+    fi
 }
 
 #
@@ -287,8 +315,9 @@ case "$VM_TYPE" in
             $LIBGUESTFS_EXTRA_VARS
             SCRIPT_DIR='$SCRIPT_DIR'
             VM_IMAGES_PATH='$VM_IMAGES_PATH'
+            CI_MIRROR_BASE='$CI_MIRROR_BASE'
             $(declare -f generate_qubesos)
-            generate_qubesos '$OUTPUT_IMAGE' '$SSH_PUB_KEY'
+            generate_qubesos '$OUTPUT_IMAGE' '$SSH_PUB_KEY' '$VERSION'
         "
         ;;
     qubesos-debian)
@@ -305,8 +334,9 @@ case "$VM_TYPE" in
             $LIBGUESTFS_EXTRA_VARS
             SCRIPT_DIR='$SCRIPT_DIR'
             VM_IMAGES_PATH='$VM_IMAGES_PATH'
+            CI_MIRROR_BASE='$CI_MIRROR_BASE'
             $(declare -f generate_qubesos)
-            generate_qubesos '$OUTPUT_IMAGE' '$SSH_PUB_KEY'
+            generate_qubesos '$OUTPUT_IMAGE' '$SSH_PUB_KEY' '$VERSION'
         "
         ;;
     *)
