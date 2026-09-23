@@ -12,8 +12,6 @@ MIRROR="${MIRROR%/}"
 
 MODE="${MODE:-dom0}"
 DNF_CONF="${DNF_CONF:-/etc/dnf/dnf.conf}"
-QUBES_PUBLIC="${QUBES_PUBLIC:-https://yum.qubes-os.org}"
-FEDORA_FALLBACK="${FEDORA_FALLBACK:-https://mirror.in2p3.fr/pub/fedora/linux}"
 # vm only: the caller knows which releases the mirror carries
 MIRROR_FEDORA="${MIRROR_FEDORA:-0}"
 # concurrent large transfers through the Qubes updates proxy get reset
@@ -31,19 +29,19 @@ case "$MODE" in
         esac
         MAP="fedora=$MIRROR/fedora/releases/$FEDORA/Everything/\$basearch/os/
 updates=$MIRROR/fedora/updates/$FEDORA/Everything/\$basearch/
-qubes-dom0-current=$MIRROR/qubes/repo/yum/r$RELEASE/current/dom0/fc$FEDORA/ $QUBES_PUBLIC/r$RELEASE/current/dom0/fc$FEDORA
-qubes-dom0-current-testing=$MIRROR/qubes/repo/yum/r$RELEASE/current-testing/dom0/fc$FEDORA/ $QUBES_PUBLIC/r$RELEASE/current-testing/dom0/fc$FEDORA
-qubes-dom0-security-testing=$MIRROR/qubes/repo/yum/r$RELEASE/security-testing/dom0/fc$FEDORA/ $QUBES_PUBLIC/r$RELEASE/security-testing/dom0/fc$FEDORA"
+qubes-dom0-current=$MIRROR/qubes/repo/yum/r$RELEASE/current/dom0/fc$FEDORA/
+qubes-dom0-current-testing=$MIRROR/qubes/repo/yum/r$RELEASE/current-testing/dom0/fc$FEDORA/
+qubes-dom0-security-testing=$MIRROR/qubes/repo/yum/r$RELEASE/security-testing/dom0/fc$FEDORA/"
         ;;
     vm)
         # $releasever is the Fedora release here, so let dnf expand it
-        MAP="qubes-vm-r$RELEASE-current=$MIRROR/qubes/repo/yum/r$RELEASE/current/vm/fc\$releasever/ $QUBES_PUBLIC/r$RELEASE/current/vm/fc\$releasever
-qubes-vm-r$RELEASE-current-testing=$MIRROR/qubes/repo/yum/r$RELEASE/current-testing/vm/fc\$releasever/ $QUBES_PUBLIC/r$RELEASE/current-testing/vm/fc\$releasever
-qubes-vm-r$RELEASE-security-testing=$MIRROR/qubes/repo/yum/r$RELEASE/security-testing/vm/fc\$releasever/ $QUBES_PUBLIC/r$RELEASE/security-testing/vm/fc\$releasever"
+        MAP="qubes-vm-r$RELEASE-current=$MIRROR/qubes/repo/yum/r$RELEASE/current/vm/fc\$releasever/
+qubes-vm-r$RELEASE-current-testing=$MIRROR/qubes/repo/yum/r$RELEASE/current-testing/vm/fc\$releasever/
+qubes-vm-r$RELEASE-security-testing=$MIRROR/qubes/repo/yum/r$RELEASE/security-testing/vm/fc\$releasever/"
         if [ "$MIRROR_FEDORA" = 1 ]; then
             MAP="$MAP
-fedora=$MIRROR/fedora/releases/\$releasever/Everything/\$basearch/os/ $FEDORA_FALLBACK/releases/\$releasever/Everything/\$basearch/os/
-updates=$MIRROR/fedora/updates/\$releasever/Everything/\$basearch/ $FEDORA_FALLBACK/updates/\$releasever/Everything/\$basearch/"
+fedora=$MIRROR/fedora/releases/\$releasever/Everything/\$basearch/os/
+updates=$MIRROR/fedora/updates/\$releasever/Everything/\$basearch/"
         fi
         ;;
     *)

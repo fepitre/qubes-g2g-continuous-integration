@@ -135,9 +135,9 @@ reached that way, so `set-template-mirrors.sh` maps their root partition with
 Note `$releasever` means the Qubes release in dom0 and the Fedora release in a
 template, so dom0's Fedora version is written literally and a template's is not.
 
-Each redirected repo keeps upstream as a second `baseurl`. The Qubes repos ship
-a single `baseurl` and no metalink, so without that one failure aborts the whole
-transaction. Templates also get `max_parallel_downloads=1`, because concurrent
+Redirected repos point at the mirror only, with no upstream fallback: a broken
+mirror should fail the job rather than be papered over by quietly fetching from
+upstream. Templates also get `max_parallel_downloads=1`, because concurrent
 large transfers through the Qubes updates proxy get reset.
 
 `MIRRORED_FEDORA` names the Fedora releases the mirror carries. Templates on any
