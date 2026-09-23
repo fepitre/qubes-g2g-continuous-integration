@@ -126,6 +126,24 @@ does.
 
 Leave the flag off on hosts that do not run a mirror.
 
+#### What `--mirror` touches
+
+dom0 is patched inside the image with `virt-customize`. Templates cannot be
+reached that way, so `set-template-mirrors.sh` maps their root partition with
+`dmsetup` and mounts it from the host.
+
+Note `$releasever` means the Qubes release in dom0 and the Fedora release in a
+template, so dom0's Fedora version is written literally and a template's is not.
+
+Each redirected repo keeps upstream as a second `baseurl`. The Qubes repos ship
+a single `baseurl` and no metalink, so without that one failure aborts the whole
+transaction. Templates also get `max_parallel_downloads=1`, because concurrent
+large transfers through the Qubes updates proxy get reset.
+
+`MIRRORED_FEDORA` names the Fedora releases the mirror carries. Templates on any
+other release keep their stock metalink. Keep it in step with `--fedora-releases`
+in `mirror-repos.py` and the `pub-mirror` role.
+
 Output images and their versionless symlinks in `/var/lib/libvirt/images/`:
 
 | Type | Versioned image | Symlink |

@@ -265,8 +265,10 @@ generate_qubesos() {
         virt-customize -a "$qubes_image" \
             --copy-in "$SCRIPT_DIR/set-dom0-mirror.sh:/usr/local/bin/" \
             --chmod 0755:/usr/local/bin/set-dom0-mirror.sh \
-            --run-command "/usr/local/bin/set-dom0-mirror.sh '$CI_MIRROR_BASE' '$qubes_release'" \
-            --run-command 'rm -f /usr/local/bin/set-dom0-mirror.sh'
+            --run-command "/usr/local/bin/set-dom0-mirror.sh '$CI_MIRROR_BASE' '$qubes_release'"
+        # Templates are not reachable with virt-customize, so they are patched
+        # from the host against their mounted root volumes.
+        "$SCRIPT_DIR/set-template-mirrors.sh" "$CI_MIRROR_BASE" "$qubes_release" "$qubes_image"
     fi
 }
 
