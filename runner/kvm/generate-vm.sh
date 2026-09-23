@@ -270,6 +270,9 @@ generate_qubesos() {
         # from the host against their mounted root volumes.
         "$SCRIPT_DIR/set-template-mirrors.sh" "$CI_MIRROR_BASE" "$qubes_release" "$qubes_image"
     fi
+
+    # offloads on the emulated NIC corrupt traffic
+    "$SCRIPT_DIR/set-netvm-offload.sh" "$qubes_image"
 }
 
 #
