@@ -24,9 +24,7 @@ RUN echo '{"services": ["gitlabci"]}' > /home/user/qubes-builder-github/webhooks
 
 # Copy RPC and tools in local bin.
 RUN cp /home/user/qubes-g2g-continuous-integration/qubes-rpc/gitlabci.G2G \
-        /home/user/qubes-g2g-continuous-integration/tools/g2g-wol-runners \
         /usr/local/bin/
-RUN chmod +x /usr/local/bin/gitlabci.G2G /usr/local/bin/g2g-wol-runners
 
 # Copy simple nginx conf
 RUN cp /home/user/qubes-g2g-continuous-integration/docker/nginx.conf /etc/nginx/nginx.conf
