@@ -9,7 +9,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VM_IMAGES_PATH="/var/lib/libvirt/images"
 OPENQA_BASE_URL="https://openqa.qubes-os.org"
 OPENQA_API="$OPENQA_BASE_URL/api/v1"
-LIBGUESTFS_EXTRA_VARS=""
+# Session libvirt fails under sudo: SELinux denies passt, core limit is 0
+LIBGUESTFS_EXTRA_VARS="export LIBGUESTFS_BACKEND=direct"
 
 # Base URL of a local package mirror (nginx serving /pub), from --mirror or
 # the environment. When set, dom0's Fedora and Qubes repos are pointed at it
@@ -25,7 +26,7 @@ CI_MIRROR_BASE="${CI_MIRROR_BASE:-}"
 while true; do
     case "${1:-}" in
         --debug)
-            LIBGUESTFS_EXTRA_VARS="export LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1"
+            LIBGUESTFS_EXTRA_VARS="$LIBGUESTFS_EXTRA_VARS LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1"
             shift
             ;;
         --mirror)

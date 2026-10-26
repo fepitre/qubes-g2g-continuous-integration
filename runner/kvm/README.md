@@ -194,6 +194,7 @@ The wrapper:
 - Ensures the `libvirt` group has write access to `/var/lib/libvirt/images/`
 - Resolves `gitlab-runner`'s SSH public key and injects it into the VM
 - Runs `virt-builder`/`virt-customize` as `gitlab-runner` (not root) to avoid a `passt` privilege issue
+- Uses the libguestfs `direct` backend: under `sudo`, session libvirt cannot start `passt` with SELinux enforcing, nor raise the core limit sudo sets to 0
 - For `qubesos` and `qubesos-debian`, downloads the latest passing job from OpenQA (`install_unencrypted_full_upload` / `install_unencrypted_debian_upload`); supports resume and verifies size on completion
 - Fixes ownership of the qubesos image to `gitlab-runner` before customization so `virt-customize` can write to it
 - Sets the final image ownership to `libvirt-qemu:kvm` with mode `660`
