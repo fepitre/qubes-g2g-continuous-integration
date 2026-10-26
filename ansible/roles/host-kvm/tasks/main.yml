@@ -163,6 +163,6 @@
 #   sudo {{ kvm_executor_scripts_dir }}/generate-vm.sh fedora
 #   sudo {{ kvm_executor_scripts_dir }}/generate-vm.sh debian
 #   sudo {{ kvm_executor_scripts_dir }}/generate-vm.sh \
-#     --mirror http://192.168.122.1/pub qubesos
-# See runner/kvm/README.md for the full list of kinds. --mirror points dom0 at
-# the local mirror; leave it out on hosts that do not run one.
+#     --mirror https://pub.notset.fr qubesos
+# See runner/kvm/README.md for the full list of kinds. --mirror points dom0 and
+# the templates at the pub.notset.fr package repos.
